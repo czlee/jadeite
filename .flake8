@@ -1,3 +1,9 @@
 [flake8]
+
+# E128 continuation line under-indented for visual indent
+# Q000 Remove bad quotes
+ignore = E128,Q000
+
 max-line-length = 105
-ignore = Q000
+import-order-style = edited
+application-import-names = data,results

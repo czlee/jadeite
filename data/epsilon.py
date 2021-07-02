@@ -18,7 +18,7 @@ from pathlib import Path
 import tensorflow as tf
 
 try:
-    from .config import DATA_DIRECTORY
+    from config import DATA_DIRECTORY
 except ImportError:
     print("Copy config.py.example to config.py and set DATA_DIRECTORY to the path")
     print("where data files should be found.")
@@ -93,9 +93,3 @@ def train_dataset():
 ntrain = _length_of_file(epsilon_location / "epsilon_normalized")
 
 ntest = _length_of_file(epsilon_location / "epsilon_normalized.t")
-
-
-if __name__ == "__main__":
-    # basic sanity check
-    for x, y in test_dataset().take(3):
-        print(x, y)
