@@ -28,15 +28,32 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
 
 def log_arguments(args, results_dir):
     filename = results_dir / "arguments.txt"
-    with open(filename, 'w') as f:
-        f.write("script: " + sys.argv[0] + "\n")
 
+    script = sys.argv[0]
+    started = datetime.datetime.now().isoformat()
+
+    try:
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+        changed_files = subprocess.check_output(["git", "diff-index", "--name-only", "HEAD"])
+    except subprocess.CalledProcessError:
+        print("\033[1;33mWarning: Could not detect git commit hash\033[0m")
+        commit = "<could not detect>"
+    changed_files = changed_files.decode().strip().split('\n')
+
+    with open(filename, 'w') as f:
+        f.write("script: " + script + "\n")
+        f.write("started: " + started + "\n")
         f.write("commit: " + commit + "\n")
+        if changed_files:
+            f.write("files with uncommitted changes:\n")
+            for changed_file in changed_files:
+                f.write(" - " + changed_file + "\n")
 
         f.write("\n== arguments ==\n")
         for key, value in vars(args).items():
             f.write(f"{key}: {value}\n")
+
+    return filename
 
 
 def log_evaluation(eval_dict, results_dir):
@@ -44,3 +61,18 @@ def log_evaluation(eval_dict, results_dir):
     with open(filename, 'w') as f:
         for key, value in eval_dict.items():
             f.write(f"{key}: {value}\n")
+
+
+if __name__ == "__main__":
+    # for debugging arguments.txt only
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test-argument", default=42)
+    parser.add_argument("--test-argument-2", default=False, action='store_true')
+    args = parser.parse_args()
+
+    results_dir = create_results_directory()
+    results_file = log_arguments(args, results_dir)
+    with open(results_file) as f:
+        contents = f.read()
+        print(contents)
