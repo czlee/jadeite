@@ -47,6 +47,8 @@ class Logistic(nn.Module):
 def train(dataloader, model, loss_fn, optimizer):
     model.train()  # doesn't do anything here, but as a habit
 
+    nbatches = len(train_dataloader)
+
     for batch, (x, y) in enumerate(dataloader):
         x = x.to(device)
         y = y.to(device)
@@ -58,7 +60,7 @@ def train(dataloader, model, loss_fn, optimizer):
         loss.backward()
         optimizer.step()
 
-        print(f"[{batch}/{batch_size}] loss: {loss.item()}...", end='\r')
+        print(f"[{batch}/{nbatches}] loss: {loss.item()}...", end='\r')
 
     return loss.item()
 
@@ -91,8 +93,6 @@ print("model:", model)
 
 loss_fn = nn.BCELoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
-
-batches = len(train_dataloader) // batch_size
 
 csv_logfile = results_dir / 'rounds.csv'
 csv_logger = results.CsvLogger(csv_logfile)
