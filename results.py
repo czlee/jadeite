@@ -1,5 +1,6 @@
 """Result logging utilities"""
 
+import csv
 import datetime
 import subprocess
 import sys
@@ -61,6 +62,40 @@ def log_evaluation(eval_dict, results_dir):
     with open(filename, 'w') as f:
         for key, value in eval_dict.items():
             f.write(f"{key}: {value}\n")
+
+
+class CsvLogger:
+    """Similar to `tf.keras.callbacks.CsvLogger`, but to be called from
+    tensorflow-federated iterative process loops. Also, doesn't implement the
+    functionality we don't need."""
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.keys = None
+        self.writer = None
+        self.csv_file = open(filename, 'w')
+
+    def _start_writer(self, metrics):
+        if self.keys is None:
+            self.keys = sorted(metrics.keys())
+
+        fieldnames = ['round'] + self.keys
+        self.writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
+        self.writer.writeheader()
+
+    def log(self, r, metrics):
+        """Log a row. `metrics` should be a dict with the same keys as every
+        other time this is called."""
+        if self.writer is None:
+            self._start_writer(metrics)
+        row_dict = {'round': r}
+        row_dict.update(metrics)
+        self.writer.writerow(row_dict)
+        self.csv_file.flush()
+
+    def close(self):
+        self.writer = None
+        self.csv_file.close()
 
 
 if __name__ == "__main__":
