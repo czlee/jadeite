@@ -79,17 +79,17 @@ class CsvLogger:
         if self.keys is None:
             self.keys = sorted(metrics.keys())
 
-        fieldnames = ['round', 'timestamp'] + self.keys
+        fieldnames = ['epoch', 'timestamp'] + self.keys
         self.writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
         self.writer.writeheader()
 
-    def log(self, r, metrics):
+    def log(self, epoch, metrics):
         """Log a row. `metrics` should be a dict with the same keys as every
         other time this is called."""
         if self.writer is None:
             self._start_writer(metrics)
         now = datetime.datetime.now().isoformat()
-        row_dict = {'round': r, 'timestamp': now}
+        row_dict = {'epoch': epoch, 'timestamp': now}
         row_dict.update(metrics)
         self.writer.writerow(row_dict)
         self.csv_file.flush()
