@@ -39,7 +39,7 @@ def log_arguments(args, results_dir):
     except subprocess.CalledProcessError:
         print("\033[1;33mWarning: Could not detect git commit hash\033[0m")
         commit = "<could not detect>"
-    changed_files = changed_files.decode().strip().split('\n')
+    changed_files = changed_files.decode().strip()
 
     with open(filename, 'w') as f:
         f.write("script: " + script + "\n")
@@ -47,7 +47,7 @@ def log_arguments(args, results_dir):
         f.write("commit: " + commit + "\n")
         if changed_files:
             f.write("files with uncommitted changes:\n")
-            for changed_file in changed_files:
+            for changed_file in changed_files.split('\n'):
                 f.write(" - " + changed_file + "\n")
 
         f.write("\n== arguments ==\n")
@@ -79,7 +79,7 @@ class CsvLogger:
         if self.keys is None:
             self.keys = sorted(metrics.keys())
 
-        fieldnames = ['round'] + self.keys
+        fieldnames = ['round', 'timestamp'] + self.keys
         self.writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
         self.writer.writeheader()
 
@@ -88,7 +88,8 @@ class CsvLogger:
         other time this is called."""
         if self.writer is None:
             self._start_writer(metrics)
-        row_dict = {'round': r}
+        now = datetime.datetime.now().isoformat()
+        row_dict = {'round': r, 'timestamp': now}
         row_dict.update(metrics)
         self.writer.writerow(row_dict)
         self.csv_file.flush()
