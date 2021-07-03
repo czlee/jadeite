@@ -60,7 +60,8 @@ def train(dataloader, model, loss_fn, optimizer):
         loss.backward()
         optimizer.step()
 
-        print(f"[{batch}/{nbatches}] loss: {loss.item()}...", end='\r')
+        if batch % 10 == 0:
+            print(f"[{batch}/{nbatches}] loss: {loss.item()}...", end='\r')
 
     return loss.item()
 
