@@ -95,7 +95,7 @@ print("model:", model)
 loss_fn = nn.BCELoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
 
-csv_logfile = results_dir / 'rounds.csv'
+csv_logfile = results_dir / 'training.csv'
 csv_logger = results.CsvLogger(csv_logfile)
 
 for i in range(nepochs):
