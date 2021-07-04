@@ -149,7 +149,7 @@ for r in range(nrounds):
     server_aggregate(global_model, client_models)
 
     test_loss, accuracy = test(test_dataloader, global_model, loss_fn)
-    print(f"Epoch {i}: test loss {test_loss}, accuracy {accuracy}")
+    print(f"Epoch {r}: test loss {test_loss}, accuracy {accuracy}")
     records['test_loss'] = test_loss
     records['accuracy'] = accuracy
     csv_logger.log(r, records)
