@@ -28,7 +28,39 @@ except ImportError:
 epsilon_location = Path(DATA_DIRECTORY) / 'epsilon'
 
 
-def _epsilon_dataset(filepath):
+def _epsilon_tensor_dataset(filepath, verbose=True):
+    """Datasets based on tensor slices."""
+    try:
+        f = open(filepath)  # must be opened inside generator
+    except FileNotFoundError:
+        _epsilon_hint()
+        raise
+
+    if verbose:
+        print_fn = print
+    else:
+        def print_fn(message):
+            pass
+
+    x = []
+    y = []
+    print_fn(f"Loading data from {filepath}...", end=' ', flush=True)
+
+    for i, line in enumerate(f):
+        if i % 200 == 0:
+            print_fn(f"\rLoading data from {filepath}, up to "
+                     f"line {i}...", end=' ', flush=True)
+        parts = line.split()
+        y.append(1.0 if parts.pop(0) == '1' else 0.0)
+        x.append([float(part.split(':')[1]) for part in parts])
+
+    print_fn("done.")
+
+    return tf.data.Dataset.from_tensor_slices((tf.constant(x), tf.constant(y)))
+
+
+def _epsilon_generator_dataset(filepath):
+    """Datasets based on a generator function."""
 
     def _epsilon_generator():
         try:
@@ -78,16 +110,22 @@ def _length_of_file(filepath):
     return i + 1
 
 
-def test_dataset():
-    """Returns a `tf.data.Dataset` containing the test data from the "epsilon"
-    dataset."""
-    return _epsilon_dataset(epsilon_location / "epsilon_normalized.t")
-
-
-def train_dataset():
+def train_dataset(generator=False):
     """Returns a `tf.data.Dataset` containing the training data from the
     "epsilon" dataset."""
-    return _epsilon_dataset(epsilon_location / "epsilon_normalized")
+    if generator:
+        return _epsilon_generator_dataset(epsilon_location / "epsilon_normalized")
+    else:
+        return _epsilon_tensor_dataset(epsilon_location / "epsilon_normalized")
+
+
+def test_dataset(generator=True):
+    """Returns a `tf.data.Dataset` containing the test data from the "epsilon"
+    dataset."""
+    if generator:
+        return _epsilon_generator_dataset(epsilon_location / "epsilon_normalized.t")
+    else:
+        return _epsilon_tensor_dataset(epsilon_location / "epsilon_normalized.t")
 
 
 ntrain = _length_of_file(epsilon_location / "epsilon_normalized")

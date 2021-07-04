@@ -1,4 +1,5 @@
-"""Basic logistic regression, but with federated averaging.
+"""Basic logistic regression, but with federated averaging, using
+tensorflow-federated.
 
 Client data is divided equally among nodes without shuffling.
 
@@ -10,7 +11,7 @@ import argparse
 import tensorflow as tf
 import tensorflow_federated as tff
 
-import data.epsilon as epsilon
+import data.epsilon_tf as epsilon
 import results
 
 

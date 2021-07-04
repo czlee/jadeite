@@ -8,7 +8,7 @@ import argparse
 
 import tensorflow as tf
 
-import data.epsilon as epsilon
+import data.epsilon_tf as epsilon
 import results
 
 
