@@ -1,8 +1,11 @@
 """Basic logistic regression using federated averaging using PyTorch.
 
-Client data is divided equally among nodes wihtout shuffling.
+Client data is randomly divided equally among nodes.
 
-This is basically just an exercise, a translation of fedavg.py.
+This is basically just an exercise, like a translation of fedavg.py but not
+really.  Rather than use a federated learning library, it's based loosely on
+this page:
+https://towardsdatascience.com/preserving-data-privacy-in-deep-learning-part-1-a04894f78029
 """
 
 import argparse
@@ -63,8 +66,6 @@ class Logistic(nn.Module):
 
 
 # Training
-# based loosely on
-# https://towardsdatascience.com/preserving-data-privacy-in-deep-learning-part-1-a04894f78029
 
 # copied from logistic-torch.py's train()
 def client_train(dataloader, model, loss_fn, optimizer):
