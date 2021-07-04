@@ -34,10 +34,15 @@ class EpsilonDataset(torch.utils.data.TensorDataset):
     train_file = epsilon_location / "epsilon_normalized"
     test_file = epsilon_location / "epsilon_normalized.t"
 
-    def __init__(self, train=True):
+    def __init__(self, train=True, verbose=True):
         self.filename = self.train_file if train else self.test_file
+        self.verbose = verbose
         tensors = self._get_tensors(self.filename)
         super().__init__(*tensors)
+
+    def _verbose(self, *args, **kwargs):
+        if self.verbose:
+            print(*args, **kwargs)
 
     def _get_tensors(self, filename):
         try:
@@ -48,10 +53,17 @@ class EpsilonDataset(torch.utils.data.TensorDataset):
 
         x = []
         y = []
-        for line in f:
+        self._verbose(f"Loading data from {self.filename}...", end=' ', flush=True)
+
+        for i, line in enumerate(f):
+            if i % 200 == 0:
+                self._verbose(f"\rLoading data from {self.filename}, up to "
+                              f"line {i}...", end=' ', flush=True)
             parts = line.split()
             y.append([1.0 if parts.pop(0) == '1' else 0.0])
             x.append([float(part.split(':')[1]) for part in parts])
+
+        self._verbose("done.")
 
         return (torch.tensor(x), torch.tensor(y))
 
