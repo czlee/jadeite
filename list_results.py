@@ -14,7 +14,10 @@ if not resultsdir.is_dir():
     print(f"{resultsdir} is not a directory")
     exit(1)
 
-for child in resultsdir.iterdir():
+
+children = sorted(resultsdir.iterdir())
+
+for child in children:
     date = child.name
 
     argsfile = child / "arguments.txt"
