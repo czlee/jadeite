@@ -7,6 +7,8 @@ really.  Rather than use a federated learning library, it's based loosely on
 this page:
 https://towardsdatascience.com/preserving-data-privacy-in-deep-learning-part-1-a04894f78029
 """
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
 
 import argparse
 
@@ -18,7 +20,7 @@ import data.utils
 import results
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("-r", "--rounds", type=int, default=20,
     help="Number of rounds")
 parser.add_argument("-b", "--batch-size", type=int, default=64,

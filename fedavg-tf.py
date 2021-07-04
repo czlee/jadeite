@@ -6,6 +6,8 @@ Client data is divided equally among nodes without shuffling.
 This is basically just an exercise, like a translation of fedavg-torch.py back
 into TensorFlow.
 """
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
 
 import argparse
 
@@ -15,7 +17,7 @@ import data.epsilon_tf as epsilon
 import results
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("-r", "--rounds", type=int, default=20,
     help="Number of rounds")
 parser.add_argument("-b", "--batch-size", type=int, default=64,

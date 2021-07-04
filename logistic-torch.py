@@ -1,6 +1,8 @@
 """Basic logistic regression using PyTorch.
 
 Basically just an exercise to see if PyTorch is at least as comfortable."""
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
 
 import argparse
 
@@ -11,7 +13,7 @@ import data.epsilon_torch as epsilon
 import results
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("-e", "--epochs", type=int, default=20,
     help="Number of epochs")
 parser.add_argument("-b", "--batch-size", type=int, default=64,

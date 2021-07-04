@@ -11,6 +11,9 @@ In particular:
 The simplest setup is to download this to the directory data/sources/epsilon
 (using e.g. wget or curl) and extract it, and set DATA_DIRECTORY in config.py to
 data/sources (with a fully qualified path)
+
+Chuan-Zheng Lee <czlee@stanford.edu>
+July 2021
 """
 
 from pathlib import Path

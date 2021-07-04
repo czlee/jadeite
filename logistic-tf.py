@@ -3,6 +3,8 @@
 This is basically just an exercise, there's nothing even remotely fancy in here,
 unless you count arguments and logging callbacks.
 """
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
 
 import argparse
 
@@ -12,7 +14,7 @@ import data.epsilon_tf as epsilon
 import results
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("-e", "--epochs", type=int, default=20,
     help="Number of epochs")
 parser.add_argument("-b", "--batch-size", type=int, default=64,

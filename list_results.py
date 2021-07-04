@@ -1,9 +1,11 @@
 """Summarizes results in the given results directory."""
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
 
 import argparse
 from pathlib import Path
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
     help="Results directory")
 args = parser.parse_args()

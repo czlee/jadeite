@@ -1,4 +1,7 @@
-"""Result logging utilities"""
+"""Result logging utilities.
+
+Chuan-Zheng Lee <czlee@stanford.edu>
+July 2021"""
 
 import csv
 import datetime
