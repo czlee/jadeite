@@ -56,7 +56,7 @@ def client_train(dataset, model, loss_fn, optimizer):
         gradients = tape.gradient(loss, model.trainable_weights)
         optimizer.apply_gradients(zip(gradients, model.trainable_weights))
 
-    return loss
+    return loss.numpy()
 
 
 def server_aggregate(global_model, client_models):
@@ -79,7 +79,7 @@ def test(dataset, model, loss_fn, accuracy_fn):
         accuracy_fn.update_state(y, pred)
         test_losses.append(loss_fn(y, pred))
 
-    test_loss = tf.math.reduce_mean(test_losses)
+    test_loss = tf.math.reduce_mean(test_losses).numpy()
     accuracy = accuracy_fn.result().numpy()
     return test_loss, accuracy
 
