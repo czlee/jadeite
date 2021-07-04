@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
-parser.add_argument("dir", type=Path, default=Path("results"),
+parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
     help="Results directory")
 args = parser.parse_args()
 
