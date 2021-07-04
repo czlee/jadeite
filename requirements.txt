@@ -1,5 +1,3 @@
 torch
-tensorflow
-tensorflow-federated
 jupyterlab
 matplotlib

@@ -15,7 +15,7 @@ import argparse
 import torch
 from torch import nn
 
-import data.epsilon_torch as epsilon
+import data.epsilon as epsilon
 import data.utils
 import results
 
