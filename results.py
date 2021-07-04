@@ -24,6 +24,8 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
         latest.unlink()
     latest.symlink_to(path)
 
+    print("Saving results to: " + str(path))
+
     return path
 
 
