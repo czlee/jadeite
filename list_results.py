@@ -22,6 +22,7 @@ for child in children:
 
     argsfile = child / "arguments.txt"
     if not argsfile.exists():
+        print(f"\033[1;31m{date}         ???\033[0m")
         continue
 
     with open(argsfile) as f:
@@ -45,4 +46,14 @@ for child in children:
             args[key] = value
         argsstring = " ".join(f"{key}={value}" for key, value in args.items())
 
-        print(f"{date} {commit} {script:<20}  {argsstring}")
+        # is it done? did it even start?
+        if len(list(child.iterdir())) == 1:
+            script = "(?) " + script
+            color = "\033[0;31m"
+        elif not (child / "result.txt").exists():
+            script = "(*) " + script
+            color = "\033[0;32m"
+        else:
+            color = ""
+
+        print(f"{color}{date} {commit} {script:<21}  {argsstring}\033[0m")
