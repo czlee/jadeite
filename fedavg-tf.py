@@ -92,7 +92,7 @@ model.summary()
 
 loss_fn = tf.keras.losses.BinaryCrossentropy()
 accuracy_fn = tf.keras.metrics.BinaryAccuracy()
-client_optimizers = [tf.keras.optimizers.SGD(lr=args.lr_client) for i in range(nclients)]
+client_optimizers = [tf.keras.optimizers.SGD(learning_rate=args.lr_client) for i in range(nclients)]
 
 csv_logfile = results_dir / 'training.csv'
 csv_logger = results.CsvLogger(csv_logfile, index_field='round')
