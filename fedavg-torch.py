@@ -71,7 +71,7 @@ class Logistic(nn.Module):
 def client_train(dataloader, model, loss_fn, optimizer):
     model.train()  # doesn't do anything here, but as a habit
 
-    for batch, (x, y) in enumerate(dataloader):
+    for x, y in dataloader:
         x = x.to(device)
         y = y.to(device)
 
@@ -91,7 +91,7 @@ def server_aggregate(global_model, client_models):
 
     global_dict = global_model.state_dict()
     for k in global_dict.keys():
-        client_states = [client_models[i].state_dict()[k].float() for i in range(len(client_models))]
+        client_states = [model.state_dict()[k].float() for model in client_models]
         global_dict[k] = torch.stack(client_states, 0).mean(0)
 
     global_model.load_state_dict(global_dict)
