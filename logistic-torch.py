@@ -24,11 +24,12 @@ batch_size = args.batch_size
 results_dir = results.create_results_directory()
 results.log_arguments(args, results_dir)
 
+print("Loading data...", end=' ', flush=True)
 train_dataset = epsilon.EpsilonDataset(train=True)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size)
-
 test_dataset = epsilon.EpsilonDataset(train=False)
 test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
+print("done.")
 
 
 class Logistic(nn.Module):
@@ -87,7 +88,7 @@ def test(dataloader, model, loss_fn):
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print("Using {} device".format(device))
+print(f"Using device: {device}")
 
 model = Logistic().to(device)
 print("model:", model)

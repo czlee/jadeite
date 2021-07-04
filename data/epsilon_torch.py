@@ -28,10 +28,39 @@ except ImportError:
 epsilon_location = Path(DATA_DIRECTORY) / 'epsilon'
 
 
-class EpsilonDataset(torch.utils.data.IterableDataset):
+class EpsilonDataset(torch.utils.data.TensorDataset):
+    """Loads the epsilon dataset into memory, and accesses as a TensorDataset."""
 
     train_file = epsilon_location / "epsilon_normalized"
     test_file = epsilon_location / "epsilon_normalized.t"
+
+    def __init__(self, train=True):
+        self.filename = self.train_file if train else self.test_file
+        tensors = self._get_tensors(self.filename)
+        super().__init__(*tensors)
+
+    def _get_tensors(self, filename):
+        try:
+            f = open(filename)  # must be opened inside generator
+        except FileNotFoundError:
+            _epsilon_hint()
+            raise
+
+        x = []
+        y = []
+        for line in f:
+            parts = line.split()
+            y.append([1.0 if parts.pop(0) == '1' else 0.0])
+            x.append([float(part.split(':')[1]) for part in parts])
+
+        return (torch.tensor(x), torch.tensor(y))
+
+
+class EpsilonIterableDataset(torch.utils.data.IterableDataset):
+    """Like EpsilonDataset, but streams from the file."""
+
+    train_file = EpsilonDataset.train_file
+    test_file = EpsilonDataset.test_file
 
     def __init__(self, train=True):
         self.filename = self.train_file if train else self.test_file
