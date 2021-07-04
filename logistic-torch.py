@@ -16,6 +16,8 @@ parser.add_argument("-e", "--epochs", type=int, default=20,
     help="Number of epochs")
 parser.add_argument("-b", "--batch-size", type=int, default=64,
     help="Batch size")
+parser.add_argument("-l", "--lr", "--learning-rate", type=float, default=1e-2,
+    help="Learning rate")
 args = parser.parse_args()
 
 nepochs = args.epochs
@@ -93,7 +95,7 @@ model = Logistic().to(device)
 print("model:", model)
 
 loss_fn = nn.BCELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
+optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
 csv_logfile = results_dir / 'training.csv'
 csv_logger = results.CsvLogger(csv_logfile)

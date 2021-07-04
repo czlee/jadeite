@@ -69,8 +69,9 @@ class CsvLogger:
     tensorflow-federated iterative process loops. Also, doesn't implement the
     functionality we don't need."""
 
-    def __init__(self, filename):
+    def __init__(self, filename, index_field='epoch'):
         self.filename = filename
+        self.index_field = index_field
         self.keys = None
         self.writer = None
         self.csv_file = open(filename, 'w')
@@ -79,17 +80,17 @@ class CsvLogger:
         if self.keys is None:
             self.keys = sorted(metrics.keys())
 
-        fieldnames = ['epoch', 'timestamp'] + self.keys
+        fieldnames = [self.index_field, 'timestamp'] + self.keys
         self.writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
         self.writer.writeheader()
 
-    def log(self, epoch, metrics):
+    def log(self, number, metrics):
         """Log a row. `metrics` should be a dict with the same keys as every
         other time this is called."""
         if self.writer is None:
             self._start_writer(metrics)
         now = datetime.datetime.now().isoformat()
-        row_dict = {'epoch': epoch, 'timestamp': now}
+        row_dict = {self.index_field: number, 'timestamp': now}
         row_dict.update(metrics)
         self.writer.writerow(row_dict)
         self.csv_file.flush()
