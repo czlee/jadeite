@@ -40,6 +40,8 @@ parser.add_argument("-P", "--power", type=float, default=1.0,
     help="Power level, P")
 parser.add_argument("-B", "--parameter-radius", type=float, default=1.0,
     help="Parameter radius, B")
+parser.add_argument("--small", action="store_true", default=False,
+    help="Use a small dataset for testing")
 args = parser.parse_args()
 
 nrounds = args.rounds
@@ -53,7 +55,7 @@ results.log_arguments(args, results_dir)
 
 # Load data (only training data is split)
 
-train_dataset = epsilon.EpsilonDataset(train=True)
+train_dataset = epsilon.EpsilonDataset(train=True, small=args.small)
 client_lengths = data.utils.divide_integer_evenly(len(train_dataset), nclients)
 client_datasets = torch.utils.data.random_split(train_dataset, client_lengths)
 client_dataloaders = [
@@ -61,7 +63,7 @@ client_dataloaders = [
     for dataset in client_datasets
 ]
 
-test_dataset = epsilon.EpsilonDataset(train=False)
+test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)
 test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
 
 # The epsilon dataset  is instance-wisely scaled to unit length, which makes
@@ -126,7 +128,7 @@ def channel(client_symbols: List[torch.Tensor]) -> torch.Tensor:
     """
     all_symbols = torch.vstack(client_symbols)
     sum_symbols = torch.sum(all_symbols, dim=0, keepdim=True)
-    noise_sample = torch.normal(0.0, sqrt(noise), size=sum_symbols.size()).to(device)
+    noise_sample = torch.normal(0.0, sqrt(noise), size=sum_symbols.size())
     output = sum_symbols + noise_sample
     assert output.dim() == 2 and output.size()[0] == 1
     return output

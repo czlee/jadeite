@@ -28,17 +28,17 @@ except ImportError:
     exit(1)
 
 
-epsilon_location = Path(DATA_DIRECTORY) / 'epsilon'
+def _get_data_location(train, small):
+    directory = 'epsilon-small' if small else 'epsilon'
+    filename = 'epsilon_normalized' if train else 'epsilon_normalized.t'
+    return Path(DATA_DIRECTORY) / directory / filename
 
 
 class EpsilonDataset(torch.utils.data.TensorDataset):
     """Loads the epsilon dataset into memory, and accesses as a TensorDataset."""
 
-    train_file = epsilon_location / "epsilon_normalized"
-    test_file = epsilon_location / "epsilon_normalized.t"
-
-    def __init__(self, train=True, verbose=True):
-        self.filename = self.train_file if train else self.test_file
+    def __init__(self, train=True, small=True, verbose=True):
+        self.filename = _get_data_location(train, small)
         self.verbose = verbose
         tensors = self._get_tensors(self.filename)
         super().__init__(*tensors)
@@ -51,7 +51,7 @@ class EpsilonDataset(torch.utils.data.TensorDataset):
         try:
             f = open(filename)  # must be opened inside generator
         except FileNotFoundError:
-            _epsilon_hint()
+            _epsilon_hint(filename)
             raise
 
         x = []
@@ -74,11 +74,8 @@ class EpsilonDataset(torch.utils.data.TensorDataset):
 class EpsilonIterableDataset(torch.utils.data.IterableDataset):
     """Like EpsilonDataset, but streams from the file."""
 
-    train_file = EpsilonDataset.train_file
-    test_file = EpsilonDataset.test_file
-
-    def __init__(self, train=True):
-        self.filename = self.train_file if train else self.test_file
+    def __init__(self, train=True, small=True):
+        self.filename = _get_data_location(train, small)
         self.length = _length_of_file(self.filename)
 
     def __iter__(self):
@@ -86,7 +83,7 @@ class EpsilonIterableDataset(torch.utils.data.IterableDataset):
             try:
                 f = open(self.filename)  # must be opened inside generator
             except FileNotFoundError:
-                _epsilon_hint()
+                _epsilon_hint(self.filename)
                 raise
 
             for line in f:
@@ -103,13 +100,13 @@ class EpsilonIterableDataset(torch.utils.data.IterableDataset):
         return self.length
 
 
-def _epsilon_hint():
+def _epsilon_hint(location):
     print("-" * 80)
     print("\033[1;31mError: Data file not found\033[0m")
     print("Hint: Download the epsilon dataset (both files) from")
     print("  https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#epsilon")
     print("and extract it (using bunzip2) to this directory:")
-    print("  " + str(epsilon_location))
+    print("  " + str(location.parent))
     print("You can change this directory in config.py")
     print("-" * 80)
 
