@@ -126,7 +126,7 @@ def channel(client_symbols: List[torch.Tensor]) -> torch.Tensor:
     """
     all_symbols = torch.vstack(client_symbols)
     sum_symbols = torch.sum(all_symbols, dim=0, keepdim=True)
-    noise_sample = torch.normal(0.0, sqrt(noise), size=sum_symbols.size())
+    noise_sample = torch.normal(0.0, sqrt(noise), size=sum_symbols.size()).to(device)
     output = sum_symbols + noise_sample
     assert output.dim() == 2 and output.size()[0] == 1
     return output
