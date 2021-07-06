@@ -68,6 +68,7 @@ def log_arguments(args, results_dir):
 
 def log_evaluation(eval_dict, results_dir):
     filename = results_dir / "evaluation.json"
+    eval_dict['finished'] = datetime.datetime.now().isoformat()
     with open(filename, 'w') as f:
         json.dump(eval_dict, f, indent=2)
 
