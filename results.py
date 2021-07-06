@@ -23,7 +23,6 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
     it."""
     now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = Path(results_base_dir) / now
-    path.mkdir(parents=True)
     if path.exists():
         for letter in string.ascii_lowercase:
             path = Path(results_base_dir) / (now + letter)
