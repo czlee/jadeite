@@ -3,6 +3,7 @@
 # July 2021
 
 import argparse
+import json
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -17,16 +18,7 @@ if not resultsdir.is_dir():
     exit(1)
 
 
-children = sorted(resultsdir.iterdir())
-
-for child in children:
-    date = child.name
-
-    argsfile = child / "arguments.txt"
-    if not argsfile.exists():
-        print(f"\033[1;31m{date}         ???\033[0m")
-        continue
-
+def process_legacy_arguments(argsfile):
     with open(argsfile) as f:
         script = None
         commit = None
@@ -35,27 +27,51 @@ for child in children:
                 script = line[8:].strip()
             if line.startswith("commit: "):
                 commit = line[8:15].strip()
-
             if line.strip() == "== arguments ==":
                 break
 
-        # arguments
-        args = {}
+        arguments = {}
         for line in f:
             key, value = line.split(sep=':', maxsplit=1)
             key = key.strip()
             value = value.strip()
-            args[key] = value
-        argsstring = " ".join(f"{key}={value}" for key, value in args.items())
+            arguments[key] = value
 
-        # is it done? did it even start?
-        if len(list(child.iterdir())) == 1:
-            script = "(?) " + script
-            color = "\033[0;31m"
-        elif not (child / "result.txt").exists():
-            script = "(*) " + script
-            color = "\033[0;32m"
+    return script, commit, arguments
+
+
+children = sorted(resultsdir.iterdir())
+
+for child in children:
+    date = child.name
+
+    argsfile = child / "arguments.json"
+
+    if not argsfile.exists():
+        legacy_argsfile = child / "arguments.txt"
+        if legacy_argsfile.exists():
+            script, commit, arguments = process_legacy_arguments(legacy_argsfile)
         else:
-            color = ""
+            print(f"\033[1;31m{date}         ???\033[0m")
+            continue
 
-        print(f"{color}{date} {commit} {script:<21}  {argsstring}\033[0m")
+    else:
+        with open(argsfile) as f:
+            args_dict = json.load(f)
+        script = args_dict.get('script', '???')
+        commit = args_dict.get('git', {}).get('commit', '???    ')[:7]
+        arguments = args_dict.get('args', {})
+
+    argsstring = " ".join(f"{key}={value}" for key, value in arguments.items())
+
+    # is it done? did it even start?
+    if len(list(child.iterdir())) == 1:
+        script = "(?) " + script
+        color = "\033[0;31m"
+    elif not (child / "result.txt").exists():
+        script = "(*) " + script
+        color = "\033[0;32m"
+    else:
+        color = ""
+
+    print(f"{color}{date} {commit} {script:<21}  {argsstring}\033[0m")

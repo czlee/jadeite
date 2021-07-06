@@ -5,6 +5,8 @@ July 2021"""
 
 import csv
 import datetime
+import json
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -33,40 +35,41 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
 
 
 def log_arguments(args, results_dir):
-    filename = results_dir / "arguments.txt"
 
-    script = sys.argv[0]
-    started = datetime.datetime.now().isoformat()
+    info = {}
+    info['script'] = sys.argv[0]
+    info['started'] = datetime.datetime.now().isoformat()
+    info['host'] = socket.gethostname()
 
+    git = {}
     try:
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
-        changed_files = subprocess.check_output(["git", "diff-index", "--name-only", "HEAD"])
+        git['commit'] = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
     except subprocess.CalledProcessError:
         print("\033[1;33mWarning: Could not detect git commit hash\033[0m")
-        commit = "<could not detect>"
-    changed_files = changed_files.decode().strip()
+        git['commit'] = None
+        git['error'] = "could not detect commit"
 
-    with open(filename, 'w') as f:
-        f.write("script: " + script + "\n")
-        f.write("started: " + started + "\n")
-        f.write("commit: " + commit + "\n")
-        if changed_files:
-            f.write("files with uncommitted changes:\n")
-            for changed_file in changed_files.split('\n'):
-                f.write(" - " + changed_file + "\n")
+    try:
+        changed_files = subprocess.check_output(["git", "diff-index", "--name-only", "HEAD"])
+    except subprocess.CalledProcessError:
+        print("\033[1;33mWarning: Could not detect git diff-index\033[0m")
+        git['changed_files'] = []
+    else:
+        git['changed_files'] = changed_files.decode().strip().split('\n')
 
-        f.write("\n== arguments ==\n")
-        for key, value in vars(args).items():
-            f.write(f"{key}: {value}\n")
+    info['git'] = git
+    info['args'] = vars(args)
 
-    return filename
+    info['command'] = sys.argv
+
+    with open(results_dir / "arguments.json", 'w') as f:
+        json.dump(info, f, indent=2)
 
 
 def log_evaluation(eval_dict, results_dir):
-    filename = results_dir / "result.txt"
+    filename = results_dir / "evaluation.json"
     with open(filename, 'w') as f:
-        for key, value in eval_dict.items():
-            f.write(f"{key}: {value}\n")
+        json.dump(eval_dict, f, indent=2)
 
 
 class CsvLogger:
@@ -114,7 +117,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     results_dir = create_results_directory()
-    results_file = log_arguments(args, results_dir)
-    with open(results_file) as f:
-        contents = f.read()
-        print(contents)
+    log_arguments(args, results_dir)
