@@ -7,6 +7,7 @@ import csv
 import datetime
 import json
 import socket
+import string
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,15 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
     it."""
     now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = Path(results_base_dir) / now
+    path.mkdir(parents=True)
+    if path.exists():
+        for letter in string.ascii_lowercase:
+            path = Path(results_base_dir) / (now + letter)
+            if not path.exists():
+                break
+        else:
+            print("Could not create new results directory")
+            exit(1)
     path.mkdir(parents=True)
 
     latest = Path('latest')
