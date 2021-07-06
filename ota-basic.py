@@ -114,8 +114,8 @@ def client_transmit(model) -> torch.Tensor:
     working with the given (client) `model`, as a row tensor. The symbols
     """
     state = model.state_dict()  # this is an OrderedDict
-    symbols = torch.column_stack(tuple(state.values()))
-    symbols *= sqrt(power) / parameter_radius
+    values = torch.column_stack(tuple(state.values()))
+    symbols = values * sqrt(power) / parameter_radius
     assert symbols.dim() == 2 and symbols.size()[0] == 1
     return symbols
 
@@ -186,7 +186,7 @@ for model in client_models:  # initial sync with global model
 print("model:", global_model)
 print("state dict:", global_model.state_dict())
 
-loss_fn = nn.BCELoss()
+loss_fn = nn.functional.binary_cross_entropy
 client_optimizers = [torch.optim.SGD(model.parameters(), lr=args.lr_client) for model in client_models]
 
 csv_logfile = results_dir / 'training.csv'
@@ -203,12 +203,12 @@ for r in range(nrounds):
     tx_symbols = []
     for i, (dataloader, model, optimizer) in enumerate(clients):
         loss = client_train(dataloader, model, loss_fn, optimizer)
-        # print(f"Client {i} of {nclients}: loss {loss}")
+        print(f"Client {i} of {nclients}: loss {loss}")
         records[f"train_loss_client{i}"] = loss
 
         symbols = client_transmit(model)
         tx_symbols.append(symbols)
-        tx_powers[r, i] = np.square(symbols.numpy()).sum() / symbols.numel()
+        tx_powers[r, i] = symbols.square().sum().cpu() / symbols.numel()
 
     rx_symbols = channel(tx_symbols)
     server_receive(global_model, rx_symbols)
