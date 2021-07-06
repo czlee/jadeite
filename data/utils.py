@@ -10,6 +10,6 @@ def divide_integer_evenly(n, m):
     ```
     """
     lengths = [n // m] * m
-    for i in range(m - sum(lengths)):
+    for i in range(n - sum(lengths)):
         lengths[i] += 1
     return lengths
