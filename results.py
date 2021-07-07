@@ -84,8 +84,8 @@ def log_evaluation(eval_dict, results_dir):
 
 class CsvLogger:
     """Similar to `tf.keras.callbacks.CsvLogger`, but to be called from
-    tensorflow-federated iterative process loops. Also, doesn't implement the
-    functionality we don't need."""
+    iterative process loops. Also, doesn't implement the functionality we don't
+    need."""
 
     def __init__(self, filename, index_field='epoch'):
         self.filename = filename

@@ -212,7 +212,9 @@ for r in range(nrounds):
 
         symbols = client_transmit(model)
         tx_symbols.append(symbols)
-        tx_powers[r, i] = symbols.square().sum().cpu() / symbols.numel()
+        tx_power = (symbols.square().sum().cpu() / symbols.numel()).numpy()
+        records[f"tx_power_client{i}"] = tx_power
+        tx_powers[r, i] = tx_power
 
     rx_symbols = channel(tx_symbols)
     server_receive(global_model, rx_symbols)
@@ -222,6 +224,11 @@ for r in range(nrounds):
     records['test_loss'] = test_loss
     records['accuracy'] = accuracy
     csv_logger.log(r, records)
+
+    model_file = results_dir / f"model_at_{r}.json"
+    with open(model_file, 'w') as f:
+        states = {k: v.tolist() for k, v in global_model.state_dict().items()}
+        json.dump(states, f, indent=2)
 
 # Evaluation
 
