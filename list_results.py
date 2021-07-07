@@ -22,6 +22,7 @@ DEFAULT_ARGUMENTS = {
     'power': 1.0,
     'parameter_radius': 1.0,
     'small': False,
+    'cpu': False,
 }
 
 resultsdir = args.dir
