@@ -1,3 +1,7 @@
 torch
+numpy
+
+# these packages are only needed to run the Jupyter notebooks
 jupyterlab
 matplotlib
+pandas
