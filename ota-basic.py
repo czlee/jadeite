@@ -42,6 +42,8 @@ parser.add_argument("-B", "--parameter-radius", type=float, default=1.0,
     help="Parameter radius, B")
 parser.add_argument("--small", action="store_true", default=False,
     help="Use a small dataset for testing")
+parser.add_argument("--cpu", action="store_true", default=False,
+    help="Force use of CPU (i.e. don't use CUDA)")
 args = parser.parse_args()
 
 nrounds = args.rounds
@@ -178,7 +180,7 @@ def test(dataloader, model, loss_fn):
     return test_loss, accuracy
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
 print(f"Using device: {device}")
 
 global_model = Logistic().to(device)
