@@ -82,7 +82,7 @@ for child in children:
     if len(list(child.iterdir())) == 1:
         script = "(?) " + script
         color = "\033[0;31m"
-    elif not (child / "result.txt").exists():
+    elif not (child / "result.txt").exists() and not (child / "evaluation.json").exists():
         script = "(*) " + script
         color = "\033[0;32m"
     else:
