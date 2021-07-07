@@ -9,7 +9,20 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
     help="Results directory")
+parser.add_argument("-s", "--show", nargs='+', default=[],
+    help="Always show these arguments, even if equal to the default")
 args = parser.parse_args()
+
+DEFAULT_ARGUMENTS = {
+    'rounds': 20,
+    'batch_size': 64,
+    'clients': 10,
+    'lr_client': 0.01,
+    'noise': 1.0,
+    'power': 1.0,
+    'parameter_radius': 1.0,
+    'small': False,
+}
 
 resultsdir = args.dir
 
@@ -62,7 +75,8 @@ for child in children:
         commit = args_dict.get('git', {}).get('commit', '???    ')[:7]
         arguments = args_dict.get('args', {})
 
-    argsstring = " ".join(f"{key}={value}" for key, value in arguments.items())
+    argsstring = " ".join(f"{key}={value}" for key, value in arguments.items()
+                          if DEFAULT_ARGUMENTS.get(key) != value or key in args.show)
 
     # is it done? did it even start?
     if len(list(child.iterdir())) == 1:
