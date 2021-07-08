@@ -20,6 +20,10 @@ parser.add_argument("-b", "--batch-size", type=int, default=64,
     help="Batch size")
 parser.add_argument("-l", "--lr", "--learning-rate", type=float, default=1e-2,
     help="Learning rate")
+parser.add_argument("--small", action="store_true", default=False,
+    help="Use a small dataset for testing")
+parser.add_argument("--cpu", action="store_true", default=False,
+    help="Force use of CPU (i.e. don't use CUDA)")
 args = parser.parse_args()
 
 nepochs = args.epochs
@@ -28,10 +32,10 @@ batch_size = args.batch_size
 results_dir = results.create_results_directory()
 results.log_arguments(args, results_dir)
 
-train_dataset = epsilon.EpsilonDataset(train=True)
+train_dataset = epsilon.EpsilonDataset(train=True, small=args.small)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size)
 
-test_dataset = epsilon.EpsilonDataset(train=False)
+test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)
 test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
 
 
@@ -90,7 +94,7 @@ def test(dataloader, model, loss_fn):
     return test_loss, accuracy
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
 print(f"Using device: {device}")
 
 model = Logistic().to(device)
