@@ -57,6 +57,9 @@ def process_legacy_arguments(argsfile):
 children = sorted(resultsdir.iterdir())
 
 for child in children:
+    if not child.is_dir():
+        continue
+
     date = child.name
 
     argsfile = child / "arguments.json"
