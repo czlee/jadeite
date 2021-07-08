@@ -92,7 +92,7 @@ class CsvLogger:
         self.index_field = index_field
         self.keys = None
         self.writer = None
-        self.csv_file = open(filename, 'w')
+        self.csv_file = open(filename, 'w', newline='')
 
     def _start_writer(self, metrics):
         if self.keys is None:
