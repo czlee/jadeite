@@ -37,7 +37,7 @@ def _get_data_location(train, small):
 class EpsilonDataset(torch.utils.data.TensorDataset):
     """Loads the epsilon dataset into memory, and accesses as a TensorDataset."""
 
-    def __init__(self, train=True, small=True, verbose=True):
+    def __init__(self, train=True, small=False, verbose=True):
         self.filename = _get_data_location(train, small)
         self.verbose = verbose
         tensors = self._get_tensors(self.filename)
