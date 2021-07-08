@@ -40,6 +40,9 @@ parser.add_argument("-P", "--power", type=float, default=1.0,
     help="Power level, P")
 parser.add_argument("-B", "--parameter-radius", type=float, default=1.0,
     help="Parameter radius, B")
+parser.add_argument("--data-per-client", type=int, default=None,
+    help="Override the number of data points each client has (default: "
+         "divide all data equally among clients)")
 parser.add_argument("--small", action="store_true", default=False,
     help="Use a small dataset for testing")
 parser.add_argument("--cpu", action="store_true", default=False,
@@ -58,7 +61,17 @@ results.log_arguments(args, results_dir)
 # Load data (only training data is split)
 
 train_dataset = epsilon.EpsilonDataset(train=True, small=args.small)
-client_lengths = data.utils.divide_integer_evenly(len(train_dataset), nclients)
+
+if args.data_per_client is None:
+    client_lengths = data.utils.divide_integer_evenly(len(train_dataset), nclients)
+else:
+    if args.data_per_client * nclients > len(train_dataset):
+        print(f"There isn't enough data ({len(train_dataset)}) to get {args.data_per_client} "
+              f"examples for each of {nclients} clients.")
+        exit(2)
+    client_lengths = [args.data_per_client] * nclients
+    train_dataset = torch.utils.data.Subset(train_dataset, range(args.data_per_client * nclients))
+
 client_datasets = torch.utils.data.random_split(train_dataset, client_lengths)
 client_dataloaders = [
     torch.utils.data.DataLoader(dataset, batch_size=batch_size)
