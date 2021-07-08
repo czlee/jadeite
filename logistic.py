@@ -5,6 +5,7 @@ Basically just an exercise to see if PyTorch is at least as comfortable."""
 # July 2021
 
 import argparse
+import json
 
 import torch
 from torch import nn
@@ -118,6 +119,10 @@ for i in range(nepochs):
         'accuracy': accuracy,
     })
 
+    model_file = results_dir / f"model_at_{i}.json"
+    with open(model_file, 'w') as f:
+        states = {k: v.tolist() for k, v in model.state_dict().items()}
+        json.dump(states, f, indent=2)
 
 # Evaluation
 
