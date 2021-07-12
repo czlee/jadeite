@@ -64,7 +64,8 @@ def log_arguments(args, results_dir):
         print("\033[1;33mWarning: Could not detect git diff-index\033[0m")
         git['changed_files'] = []
     else:
-        git['changed_files'] = changed_files.decode().strip().split('\n')
+        changed_files_output = changed_files.decode().strip()
+        git['changed_files'] = changed_files_output.split('\n') if changed_files_output else []
 
     info['git'] = git
     info['args'] = vars(args)
