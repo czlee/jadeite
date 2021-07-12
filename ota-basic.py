@@ -54,6 +54,7 @@ nclients = args.clients
 batch_size = args.batch_size
 noise = args.noise
 power = args.power
+parameter_radius = args.parameter_radius
 
 results_dir = results.create_results_directory()
 results.log_arguments(args, results_dir)
@@ -80,10 +81,6 @@ client_dataloaders = [
 
 test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)
 test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
-
-# The epsilon dataset  is instance-wisely scaled to unit length, which makes
-# B = 1/√d, where for the epsilon dataset, d = 2001 (2000 features, 1 bias term)
-parameter_radius = 1
 
 
 # Model
