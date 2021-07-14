@@ -82,7 +82,7 @@ class BaseFederatedExperiment(BaseExperiment):
         parser.add_argument("-r", "--rounds", type=int,
             help="Number of rounds")
         parser.add_argument("-n", "--clients", type=int,
-            help="Number of clients")
+            help="Number of clients, n")
         parser.add_argument("-l", "--lr-client", type=float, default=1e-2,
             help="Learning rate at client")
         parser.add_argument("--data-per-client", type=int, default=None,

@@ -43,7 +43,7 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
     return path
 
 
-def log_arguments(args, results_dir):
+def log_arguments(args, results_dir, other_info=None):
 
     info = {}
     info['script'] = sys.argv[0]
@@ -69,6 +69,8 @@ def log_arguments(args, results_dir):
 
     info['git'] = git
     info['args'] = vars(args)
+    if other_info is not None:
+        info['other'] = other_info
 
     info['command'] = sys.argv
 
