@@ -1,4 +1,4 @@
-"""Basic logistic regression using federated averaging."""
+"""Basic logistic regression using federated averaging over the air."""
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
