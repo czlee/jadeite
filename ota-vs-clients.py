@@ -36,10 +36,10 @@ metric_fns = {"accuracy": metrics.binary_accuracy}
 
 nclients_list = args.clients
 
-for n in nclients_list:
-    args.clients = n
-    for i in range(args.repeat):
-        print(f"=== {n} clients, iteration {i} of {args.repeat} ===")
+for i in range(args.repeat):
+    for n in nclients_list:
+        args.clients = n
+        print(f"=== Iteration {i} of {args.repeat}, {n} clients ===")
         results_dir = top_results_dir / f"clients-{n}-iteration-{i}"
         results_dir.mkdir()
         results.log_arguments(args, results_dir, other_info={'iteration': i, 'clients': n})
