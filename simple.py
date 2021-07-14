@@ -30,5 +30,5 @@ loss_fn = torch.nn.functional.binary_cross_entropy
 metric_fns = {"accuracy": metrics.binary_accuracy}
 
 experiment = SimpleExperiment.from_arguments(
-    (train_dataset, test_dataset), model, loss_fn, metric_fns, results_dir, args)
+    train_dataset, test_dataset, model, loss_fn, metric_fns, results_dir, args)
 experiment.run()
