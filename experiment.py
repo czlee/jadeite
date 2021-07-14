@@ -377,6 +377,7 @@ class FederatedAveragingExperiment(BaseExperiment):
 
             print(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
             logger.log(r, records)
+            self.log_model_json(r, self.global_model)
 
         logger.close()
         test_results = self.test()
