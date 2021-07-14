@@ -100,6 +100,19 @@ class EpsilonIterableDataset(torch.utils.data.IterableDataset):
         return self.length
 
 
+class EpsilonLogisticModel(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.stack = torch.nn.Sequential(
+            torch.nn.Linear(2000, 1),
+            torch.nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        return self.stack(x)
+
+
 def _epsilon_hint(location):
     print("-" * 80)
     print("\033[1;31mError: Data file not found\033[0m")
