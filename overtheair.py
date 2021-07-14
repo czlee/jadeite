@@ -11,7 +11,7 @@ import torch
 import data.epsilon as epsilon
 import metrics
 import results
-from experiment import OverTheAirExperiment
+from federated import OverTheAirExperiment
 
 
 parser = argparse.ArgumentParser(description=__doc__)

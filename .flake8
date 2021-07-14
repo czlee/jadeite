@@ -6,4 +6,4 @@ ignore = E128,Q000
 
 max-line-length = 105
 import-order-style = edited
-application-import-names = data,experiment,metrics,results
+application-import-names = data,experiment,federated,metrics,results
