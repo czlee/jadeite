@@ -28,7 +28,7 @@ test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)
 loss_fn = torch.nn.functional.binary_cross_entropy
 metric_fns = {"accuracy": metrics.binary_accuracy}
 
-experiment = FederatedAveragingExperiment.from_arguments_divide_evenly(
+experiment = FederatedAveragingExperiment.from_arguments(
     train_dataset, test_dataset, epsilon.EpsilonLogisticModel,
     loss_fn, metric_fns, results_dir, args)
 experiment.run()

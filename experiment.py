@@ -253,9 +253,8 @@ class FederatedAveragingExperiment(BaseExperiment):
             device='cpu',
             **params):
         """This constructor requires all client datasets, models and optimizers
-        to be pre-constructed ready to be passed into this constructor.
-
-        The constructor will sync the client models with the global model before
+        to be pre-constructed ready to be passed into this constructor. The
+        constructor will sync the client models with the global model before
         starting training.
         """
         super().__init__(loss_fn, metric_fns, results_dir, device, **params)
@@ -296,11 +295,14 @@ class FederatedAveragingExperiment(BaseExperiment):
             help="Number of clients")
         parser.add_argument("-l", "--lr-client", "--learning-rate-client",
             type=float, default=1e-2, help="Learning rate at client")
+        parser.add_argument("--data-per-client", type=int, default=None,
+            help="Override the number of data points each client has (default: "
+                 "divide all data equally among clients)")
 
         super().add_arguments(parser)
 
     @classmethod
-    def from_arguments_divide_evenly(cls,
+    def from_arguments(cls,
             train_dataset: Sequence[torch.utils.data.Dataset],
             test_dataset: torch.utils.data.Dataset,
             model_fn: Callable[[], torch.nn.Module],
@@ -314,7 +316,16 @@ class FederatedAveragingExperiment(BaseExperiment):
         device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
         nclients = args.clients
 
-        client_lengths = data.utils.divide_integer_evenly(len(train_dataset), nclients)
+        data_per_client = args.data_per_client
+        if data_per_client is None:
+            client_lengths = data.utils.divide_integer_evenly(len(train_dataset), nclients)
+        else:
+            if data_per_client * nclients > len(train_dataset):
+                raise ValueError(f"There isn't enough data ({len(train_dataset)}) to get "
+                                 f"{data_per_client} examples for each of {nclients} clients.")
+            client_lengths = [data_per_client] * nclients
+            train_dataset = torch.utils.data.Subset(train_dataset, range(data_per_client * nclients))
+
         client_datasets = torch.utils.data.random_split(train_dataset, client_lengths)
         global_model = model_fn()
         client_models = [model_fn() for i in range(nclients)]
@@ -384,9 +395,9 @@ class FederatedAveragingExperiment(BaseExperiment):
         self.log_evaluation(test_results)
 
 
-class OverTheAirExperiment(SimpleExperiment):
+class OverTheAirExperiment(FederatedAveragingExperiment):
 
-    default_params = SimpleExperiment.default_params.copy()
+    default_params = FederatedAveragingExperiment.default_params.copy()
     default_params.update({
         'epochs': 1,
         'noise': 1.0,
