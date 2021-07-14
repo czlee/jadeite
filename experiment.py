@@ -8,6 +8,7 @@ import argparse
 import json
 import pathlib
 import time
+from math import sqrt
 from typing import Callable, Dict, Sequence
 
 import torch
@@ -231,8 +232,13 @@ class SimpleExperiment(BaseExperiment):
         return self._test(self.test_dataloader, self.model)
 
 
-class FederatedAveragingExperiment(BaseExperiment):
+class BaseFederatedExperiment(BaseExperiment):
+    """Base class for federated experiments.
 
+    This takes care of splitting the datasets among clients and training
+    individual clients, which should be common functionality to all federated
+    experiments.
+    """
     default_params = BaseExperiment.default_params.copy()
     default_params.update({
         'epochs': 1,
@@ -264,6 +270,7 @@ class FederatedAveragingExperiment(BaseExperiment):
                              f"{len(client_models)} client models and "
                              f"{len(client_optimizers)} client optimizers.")
 
+        self.nclients = len(client_datasets)
         self.client_datasets = client_datasets
         self.test_dataset = test_dataset
         self.client_models = [model.to(device) for model in client_models]
@@ -289,12 +296,12 @@ class FederatedAveragingExperiment(BaseExperiment):
         """Adds relevant command-line arguments to the given `parser`, which
         should be an `argparse.ArgumentParser` object.
         """
-        parser.add_argument("-r", "--rounds", type=int, default=20,
+        parser.add_argument("-r", "--rounds", type=int,
             help="Number of rounds")
-        parser.add_argument("-c", "--clients", type=int, default=10,
+        parser.add_argument("-c", "--clients", type=int,
             help="Number of clients")
-        parser.add_argument("-l", "--lr-client", "--learning-rate-client",
-            type=float, default=1e-2, help="Learning rate at client")
+        parser.add_argument("-l", "--lr-client", type=float, default=1e-2,
+            help="Learning rate at client")
         parser.add_argument("--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
                  "divide all data equally among clients)")
@@ -350,16 +357,21 @@ class FederatedAveragingExperiment(BaseExperiment):
         """
         records = {}
         clients = zip(self.client_dataloaders, self.client_models, self.client_optimizers)
-        nclients = len(self.client_dataloaders)
         nepochs = self.params['epochs']
 
         for i, (dataloader, model, optimizer) in enumerate(clients):
             for j in range(nepochs):
                 train_loss = self._train(dataloader, model, optimizer)
-                print(f"Client {i}/{nclients}, epoch {j}/{nepochs}: loss {train_loss}")
+                print(f"Client {i}/{self.nclients}, epoch {j}/{nepochs}: loss {train_loss}")
             records[f"train_loss_client{i}"] = train_loss
 
         return records
+
+    def test(self):
+        return self._test(self.test_dataloader, self.global_model)
+
+
+class FederatedAveragingExperiment(BaseFederatedExperiment):
 
     def server_aggregate(self):
         """Aggregates client models by taking the mean."""
@@ -371,9 +383,6 @@ class FederatedAveragingExperiment(BaseExperiment):
         self.global_model.load_state_dict(global_dict)
         for model in self.client_models:
             model.load_state_dict(self.global_model.state_dict())
-
-    def test(self):
-        return self._test(self.test_dataloader, self.global_model)
 
     def run(self):
         """Runs the experiment once."""
@@ -395,12 +404,105 @@ class FederatedAveragingExperiment(BaseExperiment):
         self.log_evaluation(test_results)
 
 
-class OverTheAirExperiment(FederatedAveragingExperiment):
+class OverTheAirExperiment(BaseFederatedExperiment):
 
-    default_params = FederatedAveragingExperiment.default_params.copy()
+    default_params = BaseFederatedExperiment.default_params.copy()
     default_params.update({
-        'epochs': 1,
         'noise': 1.0,
         'power': 1.0,
         'parameter_radius': 1.0,
     })
+
+    @classmethod
+    def add_arguments(cls, parser):
+        """Adds relevant command-line arguments to the given `parser`, which
+        should be an `argparse.ArgumentParser` object.
+        """
+        parser.add_argument("-N", "--noise", type=float,
+            help="Noise level (variance), σₙ²")
+        parser.add_argument("-P", "--power", type=float,
+            help="Power level, P")
+        parser.add_argument("-B", "--parameter-radius", type=float,
+            help="Parameter radius, B")
+
+        super().add_arguments(parser)
+
+    def client_transmit(self, model) -> torch.Tensor:
+        """Returns the symbols that should be transmitted from the client that is
+        working with the given (client) `model`, as a row tensor. The symbols
+        """
+        P = self.params['power']             # noqa: N806
+        B = self.params['parameter_radius']  # noqa: N806
+
+        state = model.state_dict()  # this is an OrderedDict
+        values = torch.column_stack(tuple(state.values()))
+        symbols = values * sqrt(P) / B
+        assert symbols.dim() == 2 and symbols.size()[0] == 1
+        return symbols
+
+    def channel(self, client_symbols: Sequence[torch.Tensor]) -> torch.Tensor:
+        """Returns the channel output when the channel inputs are as provided in
+        `client_symbols`, which should be a list of tensors.
+        """
+        σₙ = sqrt(self.params['noise'])  # stdev
+        all_symbols = torch.vstack(client_symbols)
+        sum_symbols = torch.sum(all_symbols, dim=0, keepdim=True)
+        noise_sample = torch.normal(0.0, σₙ, size=sum_symbols.size()).to(self.device)
+        output = sum_symbols + noise_sample
+        assert output.dim() == 2 and output.size()[0] == 1
+        return output
+
+    def disaggregate(self, tensor) -> dict:
+        """Disaggregates the single row tensor into tensors for each state in the
+        model."""
+        flattened = tensor.flatten()
+        new_state_dict = {}
+        cursor = 0
+        for key, value in self.global_model.state_dict().items():
+            numel = value.numel()
+            part = flattened[cursor:cursor + numel]
+            new_state_dict[key] = part.reshape(value.size())
+            cursor += numel
+        assert cursor == flattened.numel()
+        return new_state_dict
+
+    def server_receive(self, symbols):
+        """Updates the global `model` given the `symbols` received from the channel.
+        """
+        P = self.params['power']             # noqa: N806
+        B = self.params['parameter_radius']  # noqa: N806
+
+        scaled_symbols = symbols / self.nclients * B / sqrt(P)
+        new_state_dict = self.disaggregate(scaled_symbols)
+        self.global_model.load_state_dict(new_state_dict)
+
+    def record_tx_powers(self, tx_symbols):
+        records = {}
+        for i, symbols in enumerate(tx_symbols):
+            tx_power = (symbols.square().sum().cpu() / symbols.numel()).numpy()
+            records[f"tx_power_client{i}"] = tx_power
+        return records
+
+    def run(self):
+        """Runs the experiment once."""
+        nrounds = self.params['rounds']
+        logger = self.get_csv_logger('training.csv', index_field='round')
+
+        for r in range(nrounds):
+            records = self.train_clients()
+            tx_symbols = [self.client_transmit(model) for model in self.client_models]
+            records.update(self.record_tx_powers(tx_symbols))
+
+            rx_symbols = self.channel(tx_symbols)
+            self.server_receive(rx_symbols)
+
+            test_results = self.test()
+            records.update(test_results)
+
+            print(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
+            logger.log(r, records)
+            self.log_model_json(r, self.global_model)
+
+        logger.close()
+        test_results = self.test()
+        self.log_evaluation(test_results)
