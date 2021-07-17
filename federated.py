@@ -1,4 +1,4 @@
-"""Classes for a federated experiments.
+"""Classes for federated experiments.
 
 Experiment classes are supposed to be, as far as possible, agnostic to models,
 loss functions and optimizers. They take care of training, testing and logging.
@@ -153,19 +153,17 @@ class BaseFederatedExperiment(BaseExperiment):
     def test(self):
         return self._test(self.test_dataloader, self.global_model)
 
+    def transmit_and_aggregate(self, records: dict):
+        """Transmits the client models from `self.client_models` and aggregates
+        them at the server. At the time this is called, the clients are assumed
+        to have been trained for this round (by `self.train_clients()`).
 
-class FederatedAveragingExperiment(BaseFederatedExperiment):
+        `records` is a dict that will be logged to a CSV file (with keys as
+        column headers). Subclasses may optionally add entries to this dict.
+        If they do so, they should modify the dict in-place.
 
-    def server_aggregate(self):
-        """Aggregates client models by taking the mean."""
-        global_dict = self.global_model.state_dict()
-        for k in global_dict.keys():
-            client_states = [model.state_dict()[k].float() for model in self.client_models]
-            global_dict[k] = torch.stack(client_states, 0).mean(0)
-
-        self.global_model.load_state_dict(global_dict)
-        for model in self.client_models:
-            model.load_state_dict(self.global_model.state_dict())
+        This method must be implemented by subclasses."""
+        raise NotImplementedError
 
     def run(self):
         """Runs the experiment once."""
@@ -174,7 +172,8 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
 
         for r in range(nrounds):
             records = self.train_clients()
-            self.server_aggregate()
+            self.transmit_and_aggregate(records)
+
             test_results = self.test()
             records.update(test_results)
 
@@ -185,6 +184,20 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
         logger.close()
         test_results = self.test()
         self.log_evaluation(test_results)
+
+
+class FederatedAveragingExperiment(BaseFederatedExperiment):
+
+    def transmit_and_aggregate(self, records: dict):
+        """Aggregates client models by taking the mean."""
+        global_dict = self.global_model.state_dict()
+        for k in global_dict.keys():
+            client_states = [model.state_dict()[k].float() for model in self.client_models]
+            global_dict[k] = torch.stack(client_states, 0).mean(0)
+
+        self.global_model.load_state_dict(global_dict)
+        for model in self.client_models:
+            model.load_state_dict(self.global_model.state_dict())
 
 
 class OverTheAirExperiment(BaseFederatedExperiment):
@@ -266,26 +279,10 @@ class OverTheAirExperiment(BaseFederatedExperiment):
             records[f"tx_power_client{i}"] = tx_power
         return records
 
-    def run(self):
-        """Runs the experiment once."""
-        nrounds = self.params['rounds']
-        logger = self.get_csv_logger('training.csv', index_field='round')
-
-        for r in range(nrounds):
-            records = self.train_clients()
-            tx_symbols = [self.client_transmit(model) for model in self.client_models]
-            records.update(self.record_tx_powers(tx_symbols))
-
-            rx_symbols = self.channel(tx_symbols)
-            self.server_receive(rx_symbols)
-
-            test_results = self.test()
-            records.update(test_results)
-
-            print(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
-            logger.log(r, records)
-            self.log_model_json(r, self.global_model)
-
-        logger.close()
-        test_results = self.test()
-        self.log_evaluation(test_results)
+    def transmit_and_aggregate(self, records: dict):
+        """Transmits model data over the channel, receives a noisy version at
+        the server and updates the model at the server."""
+        tx_symbols = [self.client_transmit(model) for model in self.client_models]
+        records.update(self.record_tx_powers(tx_symbols))
+        rx_symbols = self.channel(tx_symbols)
+        self.server_receive(rx_symbols)
