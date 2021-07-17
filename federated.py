@@ -22,6 +22,7 @@ class BaseFederatedExperiment(BaseExperiment):
     individual clients, which should be common functionality to all federated
     experiments.
     """
+
     default_params = BaseExperiment.default_params.copy()
     default_params.update({
         'epochs': 1,
@@ -187,6 +188,12 @@ class BaseFederatedExperiment(BaseExperiment):
 
 
 class FederatedAveragingExperiment(BaseFederatedExperiment):
+    """Class for a simple federated averaging experiment.
+
+    This class doesn't attempt to model the channel at all. It just trains
+    clients individually, and assumes the clients can send whatever they want
+    to the server errorlessly.
+    """
 
     def transmit_and_aggregate(self, records: dict):
         """Aggregates client models by taking the mean."""
@@ -201,6 +208,13 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
 
 
 class OverTheAirExperiment(BaseFederatedExperiment):
+    """Class for over-the-air experiment.
+
+    This class models our main proposed analog scheme. It trains clients, and
+    then has clients transmit symbols over a simulated Gaussian MAC. The server
+    updates the global model based on the noisy superposition of symbols that
+    it receives.
+    """
 
     default_params = BaseFederatedExperiment.default_params.copy()
     default_params.update({
