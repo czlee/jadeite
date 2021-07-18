@@ -13,7 +13,7 @@ import torch
 import data.epsilon as epsilon
 import metrics
 import results
-from federated import OverTheAirExperiment
+from experiments import OverTheAirExperiment
 
 
 parser = argparse.ArgumentParser(description=__doc__, conflict_handler='resolve')

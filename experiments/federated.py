@@ -4,6 +4,9 @@ Experiment classes are supposed to be, as far as possible, agnostic to models,
 loss functions and optimizers. They take care of training, testing and logging.
 """
 
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
+
 import argparse
 import pathlib
 from math import sqrt
@@ -12,7 +15,8 @@ from typing import Callable, Dict, Sequence
 import torch
 
 import data.utils
-from experiment import BaseExperiment
+
+from .experiment import BaseExperiment
 
 
 class BaseFederatedExperiment(BaseExperiment):
@@ -151,6 +155,31 @@ class BaseFederatedExperiment(BaseExperiment):
 
         return records
 
+    @staticmethod
+    def flatten_state_dict(state_dict: dict) -> torch.Tensor:
+        """Flattens a given model's state dict into a single tensor. Subclasses
+        can use this method to retrieve the vector that needs to be communicated
+        from clients to the server. Normally, the state dict passed to this
+        function will be that of a client model.
+        """
+        return torch.column_stack(tuple(state_dict.values()))
+
+    def unflatten_state_dict(self, tensor: torch.Tensor) -> dict:
+        """Unflattens a (presumably 1-D) tensor into a state dict compatible
+        with the global model. Subclasses can use this method to transform a
+        received vector to a form compatible with the global model.
+        """
+        flattened = tensor.flatten()
+        new_state_dict = {}
+        cursor = 0
+        for key, value in self.global_model.state_dict().items():
+            numel = value.numel()
+            part = flattened[cursor:cursor + numel]
+            new_state_dict[key] = part.reshape(value.size())
+            cursor += numel
+        assert cursor == flattened.numel()
+        return new_state_dict
+
     def test(self):
         return self._test(self.test_dataloader, self.global_model)
 
@@ -244,9 +273,8 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         P = self.params['power']             # noqa: N806
         B = self.params['parameter_radius']  # noqa: N806
 
-        state = model.state_dict()  # this is an OrderedDict
-        values = torch.column_stack(tuple(state.values()))
-        symbols = values * sqrt(P) / B
+        flattened = self.flatten_state_dict(model.state_dict())
+        symbols = flattened * sqrt(P) / B
         assert symbols.dim() == 2 and symbols.size()[0] == 1
         return symbols
 
@@ -262,20 +290,6 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         assert output.dim() == 2 and output.size()[0] == 1
         return output
 
-    def disaggregate(self, tensor) -> dict:
-        """Disaggregates the single row tensor into tensors for each state in the
-        model."""
-        flattened = tensor.flatten()
-        new_state_dict = {}
-        cursor = 0
-        for key, value in self.global_model.state_dict().items():
-            numel = value.numel()
-            part = flattened[cursor:cursor + numel]
-            new_state_dict[key] = part.reshape(value.size())
-            cursor += numel
-        assert cursor == flattened.numel()
-        return new_state_dict
-
     def server_receive(self, symbols):
         """Updates the global `model` given the `symbols` received from the channel.
         """
@@ -283,10 +297,10 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         B = self.params['parameter_radius']  # noqa: N806
 
         scaled_symbols = symbols / self.nclients * B / sqrt(P)
-        new_state_dict = self.disaggregate(scaled_symbols)
+        new_state_dict = self.unflatten_state_dict(scaled_symbols)
         self.global_model.load_state_dict(new_state_dict)
 
-    def record_tx_powers(self, tx_symbols):
+    def record_tx_powers(self, tx_symbols) -> dict:
         records = {}
         for i, symbols in enumerate(tx_symbols):
             tx_power = (symbols.square().sum().cpu() / symbols.numel()).numpy()

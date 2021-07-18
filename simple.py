@@ -11,7 +11,7 @@ import torch
 import data.epsilon as epsilon
 import metrics
 import results
-from experiment import SimpleExperiment
+from experiments import SimpleExperiment
 
 
 parser = argparse.ArgumentParser(description=__doc__)

@@ -11,7 +11,7 @@ import torch
 import data.epsilon as epsilon
 import metrics
 import results
-from federated import FederatedAveragingExperiment
+from experiments import FederatedAveragingExperiment
 
 
 parser = argparse.ArgumentParser(description=__doc__)

@@ -67,6 +67,7 @@ class EpsilonDataset(torch.utils.data.TensorDataset):
             x.append([float(part.split(':')[1]) for part in parts])
 
         self._verbose("done.")
+        f.close()
 
         return (torch.tensor(x), torch.tensor(y))
 

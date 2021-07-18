@@ -4,6 +4,9 @@ Experiment classes are supposed to be, as far as possible, agnostic to models,
 loss functions and optimizers. They take care of training, testing and logging.
 """
 
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
+
 import argparse
 import json
 import pathlib
