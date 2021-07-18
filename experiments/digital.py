@@ -71,7 +71,53 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         self.server_receive(transmissions)
 
 
-class SimpleQuantizationFederatedExperiment(BaseDigitalFederatedExperiment):
+class StochasticQuantizationMixin:
+    """Mixin for stochastic quantization functionality.
+
+    This quantization uses evenly spaced bins within a symmetric quantization
+    range [-M, M]. The parameter `M` must be specified as the
+    `quantization_range` in the parameters. For values within [-M, M],
+    quantization is either up or down randomly, so that it is equal in
+    expectation to the true value. Values outside [-M, M] will just be pulled
+    back to the range boundary, i.e., -M or M.
+    """
+
+    default_params_to_add = {
+        'quantization_range': 1.0,
+    }
+
+    @classmethod
+    def add_arguments(cls, parser):
+        """Adds relevant command-line arguments to the given `parser`, which
+        should be an `argparse.ArgumentParser` object.
+        """
+        parser.add_argument("-M", "--quantization-range", type=float,
+            help="Quantization range, [-M, M]")
+        super().add_arguments(parser)
+
+    def quantize(self, value: float, nbits: int):
+        """Quantizes the given `value` to `nbits` bits.
+
+        To quantize, the range [-M, M], where `M` is the `quantization_range`
+        parameter, is divided equally into `2 ** nbits - 1` bins. For example,
+        if M = 5:
+
+            With nbits =
+        """
+        M = self.params['parameter_range']  # noqa: N806
+        nbins = 2 ** int(nbits) - 1
+        if value < -M:
+            return 0
+        if value > M:
+            return nbins
+        binwidth = 2 * M / nbins
+        scaled = (value + M) / binwidth  # noqa: F841 work in progress
+
+    def unquantize(self, value, nbits):
+        pass
+
+
+class SimpleQuantizationFederatedExperiment(StochasticQuantizationMixin, BaseDigitalFederatedExperiment):
     """Digital federated experiment that quantizes each component of the model
     to the number of bits available for that component. Bits are allocated using
     the following simple (and presumably inefficient) strategy: If the number of
@@ -90,6 +136,9 @@ class SimpleQuantizationFederatedExperiment(BaseDigitalFederatedExperiment):
     The number of channel uses is assumed to be equal to the number of
     components. (This will probably change in a near-future implementation.)"""
 
+    default_params = BaseDigitalFederatedExperiment.default_params.copy()
+    default_params.update(StochasticQuantizationMixin.default_params_to_add)
+
     def transmit_and_aggregate(self, records: dict):
         self.cursor = 0
         super().transmit_and_aggregate(records)
@@ -107,6 +156,10 @@ class SimpleQuantizationFederatedExperiment(BaseDigitalFederatedExperiment):
         values = self.flatten_state_dict(model)
         lengths = self.divide_bits_per_channel(values.numel())
         assert len(values) == len(lengths)
+
+        transmissions = []  # noqa: F841 work in progress
+        for value, k in zip(values, lengths):
+            pass
 
     # things that need to happen
     #  - how do we quantize? like what maximum/range do we assume?
