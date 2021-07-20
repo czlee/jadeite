@@ -253,6 +253,7 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         'noise': 1.0,
         'power': 1.0,
         'parameter_radius': 1.0,
+        'send': 'deltas',
     })
 
     @classmethod
@@ -266,18 +267,55 @@ class OverTheAirExperiment(BaseFederatedExperiment):
             help="Power level, P")
         parser.add_argument("-B", "--parameter-radius", type=float,
             help="Parameter radius, B")
+        parser.add_argument("--send", choices=["params", "deltas"],
+            help="What clients should send. 'params' sends the model parameters; "
+                 "'deltas' sends additive updates to model parameters.")
 
         super().add_arguments(parser)
 
+    def get_values_to_send(self, model) -> torch.Tensor:
+        """Returns the values that should be sent from the client.
+
+        This method works at the application level, i.e. it knows nothing about
+        physical-layer communication (power, channel, etc.).
+        """
+        local_flattened = self.flatten_state_dict(model.state_dict())
+
+        if self.params['send'] == 'deltas':
+            global_flattened = self.flatten_state_dict(self.global_model.state_dict())
+            return local_flattened - global_flattened
+
+        elif self.params['send'] == 'params':
+            return local_flattened
+
+        else:
+            raise ValueError("Unknown 'send' spec: " + str(self.params['send']))
+
+    def update_global_model(self, values):
+        """Update the global model with the values provided, which should be the
+        values inferred by the server from the received signals.
+
+        This method works at the application level, i.e. it knows nothing about
+        physical-layer communication (power, channel, etc.).
+        """
+        if self.params['send'] == 'deltas':
+            global_flattened = self.flatten_state_dict(self.global_model.state_dict())
+            updated_values = global_flattened + values
+            new_state_dict = self.unflatten_state_dict(updated_values)
+
+        elif self.params['send'] == 'params':
+            new_state_dict = self.unflatten_state_dict(values)
+
+        self.global_model.load_state_dict(new_state_dict)
+
     def client_transmit(self, model) -> torch.Tensor:
         """Returns the symbols that should be transmitted from the client that is
-        working with the given (client) `model`, as a row tensor. The symbols
+        working with the given (client) `model`, as a row tensor.
         """
         P = self.params['power']             # noqa: N806
         B = self.params['parameter_radius']  # noqa: N806
-
-        flattened = self.flatten_state_dict(model.state_dict())
-        symbols = flattened * sqrt(P) / B
+        values = self.get_values_to_send(model)
+        symbols = values * sqrt(P) / B
         assert symbols.dim() == 2 and symbols.size()[0] == 1
         return symbols
 
@@ -300,8 +338,7 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         B = self.params['parameter_radius']  # noqa: N806
 
         scaled_symbols = symbols / self.nclients * B / sqrt(P)
-        new_state_dict = self.unflatten_state_dict(scaled_symbols)
-        self.global_model.load_state_dict(new_state_dict)
+        self.update_global_model(scaled_symbols)
 
     def record_tx_powers(self, tx_symbols) -> dict:
         records = {}
