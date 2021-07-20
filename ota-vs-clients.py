@@ -7,6 +7,7 @@ the automatically created results directory."""
 
 
 import argparse
+import logging
 
 import torch
 
@@ -26,6 +27,7 @@ parser.add_argument("-q", "--repeat", type=int, default=1,
     help="Number of times to repeat experiment")
 args = parser.parse_args()
 
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s | %(message)s")
 top_results_dir = results.create_results_directory()
 results.log_arguments(args, top_results_dir)
 

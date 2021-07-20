@@ -8,6 +8,7 @@ loss functions and optimizers. They take care of training, testing and logging.
 # July 2021
 
 import argparse
+import logging
 import pathlib
 from math import sqrt
 from typing import Callable, Dict, Sequence
@@ -17,6 +18,8 @@ import torch
 import data.utils
 
 from .experiment import BaseExperiment
+
+logger = logging.getLogger(__name__)
 
 
 class BaseFederatedExperiment(BaseExperiment):
@@ -150,7 +153,7 @@ class BaseFederatedExperiment(BaseExperiment):
         for i, (dataloader, model, optimizer) in enumerate(clients):
             for j in range(nepochs):
                 train_loss = self._train(dataloader, model, optimizer)
-                print(f"Client {i}/{self.nclients}, epoch {j}/{nepochs}: loss {train_loss}")
+                logger.info(f"Client {i}/{self.nclients}, epoch {j}/{nepochs}: loss {train_loss}")
             records[f"train_loss_client{i}"] = train_loss
 
         return records
@@ -198,7 +201,7 @@ class BaseFederatedExperiment(BaseExperiment):
     def run(self):
         """Runs the experiment once."""
         nrounds = self.params['rounds']
-        logger = self.get_csv_logger('training.csv', index_field='round')
+        csv_logger = self.get_csv_logger('training.csv', index_field='round')
 
         for r in range(nrounds):
             records = self.train_clients()
@@ -207,11 +210,11 @@ class BaseFederatedExperiment(BaseExperiment):
             test_results = self.test()
             records.update(test_results)
 
-            print(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
-            logger.log(r, records)
+            logger.info(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
+            csv_logger.log(r, records)
             self.log_model_json(r, self.global_model)
 
-        logger.close()
+        csv_logger.close()
         test_results = self.test()
         self.log_evaluation(test_results)
 

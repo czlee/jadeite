@@ -5,6 +5,7 @@
 
 
 import argparse
+import logging
 
 import torch
 
@@ -13,13 +14,13 @@ import metrics
 import results
 from experiments import SimpleExperiment
 
-
 parser = argparse.ArgumentParser(description=__doc__)
 SimpleExperiment.add_arguments(parser)
 parser.add_argument("--small", action="store_true", default=False,
     help="Use a small dataset for testing")
 args = parser.parse_args()
 
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s | %(message)s")
 results_dir = results.create_results_directory()
 results.log_arguments(args, results_dir)
 

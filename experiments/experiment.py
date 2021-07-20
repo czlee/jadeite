@@ -9,6 +9,7 @@ loss functions and optimizers. They take care of training, testing and logging.
 
 import argparse
 import json
+import logging
 import pathlib
 import time
 from typing import Callable, Dict
@@ -16,6 +17,8 @@ from typing import Callable, Dict
 import torch
 
 import results
+
+logger = logging.getLogger(__name__)
 
 
 class BaseExperiment:
@@ -51,7 +54,7 @@ class BaseExperiment:
         self.params.update(params)
         unexpected_params = set(self.params.keys()) - set(self.default_params.keys())
         if unexpected_params:
-            print(f"Warning: Unexpected parameters {unexpected_params}")
+            logger.warning(f"Unexpected parameters {unexpected_params}")
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
@@ -87,6 +90,10 @@ class BaseExperiment:
         logfile = self.results_dir / 'training.csv'
         return results.CsvLogger(logfile, **kwargs)
 
+    def show_progress(self, *args, **kwargs):
+        if logger.getEffectiveLevel() <= logging.INFO:
+            print(*args, **kwargs)
+
     def _train(self, dataloader, model, optimizer):
         """Trains through one epoch. The dataloader, model and optimizer need to
         be provided, so subclasses will probably want to implement a `train()`
@@ -110,7 +117,8 @@ class BaseExperiment:
 
             now = time.time()
             if now - last_update_time > 1:
-                print(f"[{batch}/{nbatches} {(batch/nbatches):.0%}] loss: {loss.item()}...", end='\r')
+                self.show_progress(f"[{batch}/{nbatches} {(batch/nbatches):.0%}] "
+                                   f"loss: {loss.item()}...", end='\r')
 
         return loss.item()
 
@@ -211,18 +219,17 @@ class SimpleExperiment(BaseExperiment):
     def run(self):
         """Runs the experiment once."""
         nepochs = self.params['epochs']
-        logger = self.get_csv_logger('training.csv')
+        csv_logger = self.get_csv_logger('training.csv')
 
         for i in range(nepochs):
-            print(f"Epoch {i} of {nepochs}...", end='\r')
             train_loss = self.train()
             test_results = self.test()
             test_results['train_loss'] = train_loss
-            print(f"Epoch {i}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
-            logger.log(i, test_results)
+            logger.info(f"Epoch {i}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
+            csv_logger.log(i, test_results)
             self.log_model_json(i, self.model)
 
-        logger.close()
+        csv_logger.close()
         test_results = self.test()
         self.log_evaluation(test_results)
 

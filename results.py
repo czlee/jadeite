@@ -6,6 +6,7 @@ July 2021"""
 import csv
 import datetime
 import json
+import logging
 import socket
 import string
 import subprocess
@@ -14,13 +15,20 @@ from pathlib import Path
 
 from config import RESULTS_DIRECTORY
 
-
+logger = logging.getLogger(__name__)
 LATEST_SYMLINK = 'latest'
 
 
-def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
+def create_results_directory(results_base_dir=RESULTS_DIRECTORY, latest_symlink=True, logfile=True):
     """Creates a timestamped results directory and returns a Path representing
-    it."""
+    it.
+
+    If `latest_symlink` is True, points the `latest` symlink to the new
+    directory.
+
+    If `logfile` is True, adds a FileHandler for 'output.log' in the new
+    directory to the given logger.
+    """
     now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = Path(results_base_dir) / now
     if path.exists():
@@ -29,16 +37,23 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY):
             if not path.exists():
                 break
         else:
-            print("Could not create new results directory")
+            logger.error("Could not create new results directory")
             exit(1)
     path.mkdir(parents=True)
 
-    latest = Path('latest')
-    if latest.is_symlink():
-        latest.unlink()
-    latest.symlink_to(path)
+    if latest_symlink:
+        latest = Path('latest')
+        if latest.is_symlink():
+            latest.unlink()
+        latest.symlink_to(path)
 
-    print("Saving results to: " + str(path))
+    if logfile:
+        handler = logging.FileHandler(path / "output.log")
+        formatter = logging.Formatter("[{levelname} {asctime} {name}] {message}", style='{')
+        handler.setFormatter(formatter)
+        logging.getLogger().addHandler(handler)
+
+    logger.info("Saving results to: " + str(path))
 
     return path
 
@@ -54,14 +69,14 @@ def log_arguments(args, results_dir, other_info=None):
     try:
         git['commit'] = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
     except subprocess.CalledProcessError:
-        print("\033[1;33mWarning: Could not detect git commit hash\033[0m")
+        logger.warning("Could not detect git commit hash")
         git['commit'] = None
         git['error'] = "could not detect commit"
 
     try:
         changed_files = subprocess.check_output(["git", "diff-index", "--name-only", "HEAD"])
     except subprocess.CalledProcessError:
-        print("\033[1;33mWarning: Could not detect git diff-index\033[0m")
+        logger.warning("Could not detect git diff-index")
         git['changed_files'] = []
     else:
         changed_files_output = changed_files.decode().strip()
