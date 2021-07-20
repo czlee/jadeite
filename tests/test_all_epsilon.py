@@ -49,9 +49,16 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
 
         self.results_dir = Path("/tmp/jadeite-test")
         self.results_dir.mkdir(exist_ok=True)
-        logging.basicConfig(filename=self.results_dir / "output.log", level=logging.DEBUG, force=True)
+
+        self.file_handler = logging.FileHandler(self.results_dir / "output.log")
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        root_logger.addHandler(self.file_handler)
 
     def tearDown(self):
+        self.file_handler.close()
+        root_logger = logging.getLogger()
+        root_logger.removeHandler(self.file_handler)
         shutil.rmtree(self.results_dir)
 
     @staticmethod
