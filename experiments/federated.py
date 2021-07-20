@@ -164,17 +164,20 @@ class BaseFederatedExperiment(BaseExperiment):
 
     @staticmethod
     def flatten_state_dict(state_dict: dict) -> torch.Tensor:
-        """Flattens a given model's state dict into a single tensor. Subclasses
-        can use this method to retrieve the vector that needs to be communicated
-        from clients to the server. Normally, the state dict passed to this
-        function will be that of a client model.
+        """Flattens a given model's state dict into a single tensor. Normally,
+        the state dict passed to this method will be that of a client model.
+
+        Subclasses normally shouldn't use this method. To retrieve the values
+        the client should send, use `get_values_to_send()`.
         """
         return torch.column_stack(tuple(state_dict.values()))
 
     def unflatten_state_dict(self, tensor: torch.Tensor) -> dict:
         """Unflattens a (presumably 1-D) tensor into a state dict compatible
-        with the global model. Subclasses can use this method to transform a
-        received vector to a form compatible with the global model.
+        with the global model.
+
+        Subclasses normally shouldn't use this method. To update the model with
+        received values, use `update_global_model()`.
         """
         flattened = tensor.flatten()
         new_state_dict = {}
@@ -188,7 +191,10 @@ class BaseFederatedExperiment(BaseExperiment):
         return new_state_dict
 
     def get_values_to_send(self, model) -> torch.Tensor:
-        """Returns the values that should be sent from the client."""
+        """Returns the values that should be sent from the client.
+
+        Subclasses can use this method to retrieve the vector that needs to be
+        communicated from clients to the server."""
         local_flattened = self.flatten_state_dict(model.state_dict())
 
         if self.params['send'] == 'deltas':
@@ -203,7 +209,11 @@ class BaseFederatedExperiment(BaseExperiment):
 
     def update_global_model(self, values):
         """Update the global model with the values provided, which should be the
-        values inferred by the server from the received signals.
+        values inferred by the server from the received signals. For example, in
+        federated averaging, `values` would be the mean of what each client
+        returns from `get_values_to_send()`.
+
+        Subclasses can use this method to handle received values.
         """
         if self.params['send'] == 'deltas':
             global_flattened = self.flatten_state_dict(self.global_model.state_dict())
