@@ -78,7 +78,12 @@ class BaseExperiment:
         parser.set_defaults(**defaults)
 
     @classmethod
-    def extract_params_from_args(cls, args, ignore_missing=[]):
+    def extract_params_from_args(cls, args: argparse.Namespace, ignore_missing=[]):
+        """Extracts parameters from arguments in an `argparse.Namespace` object.
+        Subclasses can (and should) use this to process command-line arguments,
+        and the dict returned by this function should be passed into the
+        constructor as the **params dict.
+        """
         params = {}
         args_dict = vars(args)
         for key in cls.default_params.keys():
