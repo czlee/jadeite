@@ -35,6 +35,7 @@ class BaseFederatedExperiment(BaseExperiment):
         'epochs': 1,
         'rounds': 20,
         'clients': 10,
+        'send': 'deltas',
     })
 
     def __init__(
@@ -96,6 +97,9 @@ class BaseFederatedExperiment(BaseExperiment):
         parser.add_argument("--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
                  "divide all data equally among clients)")
+        parser.add_argument("--send", choices=["params", "deltas"],
+            help="What clients should send. 'params' sends the model parameters; "
+                 "'deltas' sends additive updates to model parameters.")
 
         super().add_arguments(parser)
 
@@ -183,6 +187,34 @@ class BaseFederatedExperiment(BaseExperiment):
         assert cursor == flattened.numel()
         return new_state_dict
 
+    def get_values_to_send(self, model) -> torch.Tensor:
+        """Returns the values that should be sent from the client."""
+        local_flattened = self.flatten_state_dict(model.state_dict())
+
+        if self.params['send'] == 'deltas':
+            global_flattened = self.flatten_state_dict(self.global_model.state_dict())
+            return local_flattened - global_flattened
+
+        elif self.params['send'] == 'params':
+            return local_flattened
+
+        else:
+            raise ValueError("Unknown 'send' spec: " + str(self.params['send']))
+
+    def update_global_model(self, values):
+        """Update the global model with the values provided, which should be the
+        values inferred by the server from the received signals.
+        """
+        if self.params['send'] == 'deltas':
+            global_flattened = self.flatten_state_dict(self.global_model.state_dict())
+            updated_values = global_flattened + values
+            new_state_dict = self.unflatten_state_dict(updated_values)
+
+        elif self.params['send'] == 'params':
+            new_state_dict = self.unflatten_state_dict(values)
+
+        self.global_model.load_state_dict(new_state_dict)
+
     def test(self):
         return self._test(self.test_dataloader, self.global_model)
 
@@ -219,13 +251,18 @@ class BaseFederatedExperiment(BaseExperiment):
         self.log_evaluation(test_results)
 
 
-class FederatedAveragingExperiment(BaseFederatedExperiment):
-    """Class for a simple federated averaging experiment.
+class OldFederatedAveragingExperiment(BaseFederatedExperiment):
+    """Old version of a class for a simple federated averaging experiment.
 
-    This class doesn't attempt to model the channel at all. It just trains
-    clients individually, and assumes the clients can send whatever they want
-    to the server errorlessly.
-    """
+    This is a simpler version of FederatedAveragingExperiment. Rather than
+    flatten and unflatten the state dict, """
+
+    def __init__(self, *args, **params):
+        super().__init__(*args, **params)
+        if self.params['send'] != 'params':
+            logger.error("OldFederatedAveragingExperiment only supports sending model parameters.")
+            logger.error("Use the new FederatedAveragingExperiment to send deltas.")
+            raise ValueError("OldFederatedAveragingExperiment called with sending deltas")
 
     def transmit_and_aggregate(self, records: dict):
         """Aggregates client models by taking the mean."""
@@ -237,6 +274,25 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
         self.global_model.load_state_dict(global_dict)
         for model in self.client_models:
             model.load_state_dict(self.global_model.state_dict())
+
+
+class FederatedAveragingExperiment(BaseFederatedExperiment):
+    """Class for a simple federated averaging experiment.
+
+    This class doesn't attempt to model the channel at all. It just trains
+    clients individually, and assumes the clients can send whatever they want
+    to the server errorlessly.
+
+    This class should do the same thing as OldFederatedAveragingExperiment, just
+    in a slightly more roundabout way. It uses the `[un]flatten_state_dict()`
+    methods of BaseFederatedExperiment
+    """
+
+    def transmit_and_aggregate(self, records: dict):
+        """Aggregates client models."""
+        client_values = [self.get_values_to_send(model) for model in self.client_models]
+        client_average = torch.stack(client_values, 0).mean(0)
+        self.update_global_model(client_average)
 
 
 class OverTheAirExperiment(BaseFederatedExperiment):
@@ -253,7 +309,6 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         'noise': 1.0,
         'power': 1.0,
         'parameter_radius': 1.0,
-        'send': 'deltas',
     })
 
     @classmethod
@@ -267,46 +322,8 @@ class OverTheAirExperiment(BaseFederatedExperiment):
             help="Power level, P")
         parser.add_argument("-B", "--parameter-radius", type=float,
             help="Parameter radius, B")
-        parser.add_argument("--send", choices=["params", "deltas"],
-            help="What clients should send. 'params' sends the model parameters; "
-                 "'deltas' sends additive updates to model parameters.")
 
         super().add_arguments(parser)
-
-    def get_values_to_send(self, model) -> torch.Tensor:
-        """Returns the values that should be sent from the client.
-
-        This method works at the application level, i.e. it knows nothing about
-        physical-layer communication (power, channel, etc.).
-        """
-        local_flattened = self.flatten_state_dict(model.state_dict())
-
-        if self.params['send'] == 'deltas':
-            global_flattened = self.flatten_state_dict(self.global_model.state_dict())
-            return local_flattened - global_flattened
-
-        elif self.params['send'] == 'params':
-            return local_flattened
-
-        else:
-            raise ValueError("Unknown 'send' spec: " + str(self.params['send']))
-
-    def update_global_model(self, values):
-        """Update the global model with the values provided, which should be the
-        values inferred by the server from the received signals.
-
-        This method works at the application level, i.e. it knows nothing about
-        physical-layer communication (power, channel, etc.).
-        """
-        if self.params['send'] == 'deltas':
-            global_flattened = self.flatten_state_dict(self.global_model.state_dict())
-            updated_values = global_flattened + values
-            new_state_dict = self.unflatten_state_dict(updated_values)
-
-        elif self.params['send'] == 'params':
-            new_state_dict = self.unflatten_state_dict(values)
-
-        self.global_model.load_state_dict(new_state_dict)
 
     def client_transmit(self, model) -> torch.Tensor:
         """Returns the symbols that should be transmitted from the client that is

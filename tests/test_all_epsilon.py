@@ -84,11 +84,12 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
         self.assertFileProduced(self.results_dir / "evaluation.json")
         self.assertFileProduced(self.results_dir / "output.log")
 
-    def test_fedavg(self):
+    def _test_fedavg(self, experiment_class, send='deltas'):
         loss_fn = torch.nn.functional.binary_cross_entropy
         metric_fns = {"accuracy": metrics.binary_accuracy}
-        args = self.get_args(FederatedAveragingExperiment)
-        experiment = FederatedAveragingExperiment.from_arguments(
+        args = self.get_args(experiment_class)
+        args.send = send
+        experiment = experiment_class.from_arguments(
             self.train_dataset, self.test_dataset, epsilon.EpsilonLogisticModel,
             loss_fn, metric_fns, self.results_dir, args)
         experiment.run()
@@ -97,15 +98,14 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
         self.assertFileProduced(self.results_dir / "evaluation.json")
         self.assertFileProduced(self.results_dir / "output.log")
 
-    def test_overtheair(self):
-        loss_fn = torch.nn.functional.binary_cross_entropy
-        metric_fns = {"accuracy": metrics.binary_accuracy}
-        args = self.get_args(OverTheAirExperiment)
-        experiment = OverTheAirExperiment.from_arguments(
-            self.train_dataset, self.test_dataset, epsilon.EpsilonLogisticModel,
-            loss_fn, metric_fns, self.results_dir, args)
-        experiment.run()
+    def test_fedavg_deltas(self):
+        self._test_fedavg(FederatedAveragingExperiment, send='deltas')
 
-        self.assertFileProduced(self.results_dir / "training.csv")
-        self.assertFileProduced(self.results_dir / "evaluation.json")
-        self.assertFileProduced(self.results_dir / "output.log")
+    def test_fedavg_params(self):
+        self._test_fedavg(FederatedAveragingExperiment, send='params')
+
+    def test_overtheair_deltas(self):
+        self._test_fedavg(OverTheAirExperiment, send='deltas')
+
+    def test_overtheair_params(self):
+        self._test_fedavg(OverTheAirExperiment, send='params')
