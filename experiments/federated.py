@@ -264,8 +264,10 @@ class BaseFederatedExperiment(BaseExperiment):
 class OldFederatedAveragingExperiment(BaseFederatedExperiment):
     """Old version of a class for a simple federated averaging experiment.
 
-    This is a simpler version of FederatedAveragingExperiment. Rather than
-    flatten and unflatten the state dict, """
+    This is a simpler version of `FederatedAveragingExperiment`. Rather than
+    flatten and unflatten the state dict, it goes through the state dict and
+    averages each tensor in the state dict separately. It's deprecated in favor
+    of `FederatedAveragingExperiment`."""
 
     def __init__(self, *args, **params):
         super().__init__(*args, **params)
@@ -293,9 +295,14 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
     clients individually, and assumes the clients can send whatever they want
     to the server errorlessly.
 
-    This class should do the same thing as OldFederatedAveragingExperiment, just
-    in a slightly more roundabout way. It uses the `[un]flatten_state_dict()`
-    methods of BaseFederatedExperiment
+    This class should do the same thing as `OldFederatedAveragingExperiment`,
+    just in a slightly more roundabout way. It uses the `get_values_to_send()`
+    and `update_global_model()` methods of BaseFederatedExperiment to simplify
+    its own implementation. The advantage of doing this is that the class can
+    take advantage of options specifying what values clients should send (e.g.,
+    whether to send the model parameters themselves, or updates as deltas). The
+    disadvantage is that flattening and unflattening the state dict is, overall,
+    a little bit more complicated.
     """
 
     def transmit_and_aggregate(self, records: dict):
@@ -336,8 +343,8 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         super().add_arguments(parser)
 
     def client_transmit(self, model) -> torch.Tensor:
-        """Returns the symbols that should be transmitted from the client that is
-        working with the given (client) `model`, as a row tensor.
+        """Returns the symbols that should be transmitted from the client that
+        is working with the given (client) `model`, as a row tensor.
         """
         P = self.params['power']             # noqa: N806
         B = self.params['parameter_radius']  # noqa: N806
@@ -359,7 +366,8 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         return output
 
     def server_receive(self, symbols):
-        """Updates the global `model` given the `symbols` received from the channel.
+        """Updates the global `model` given the `symbols` received from the
+        channel.
         """
         P = self.params['power']             # noqa: N806
         B = self.params['parameter_radius']  # noqa: N806
