@@ -149,7 +149,7 @@ class SimpleStochasticQuantizationMixin:
         elif self.params['zero_bits_strategy'] == 'read-zero':
             nbits[nbits == 0] = np.nan
 
-        nbins = (2 ** nbits - 1).astype(float)
+        nbins = 2 ** nbits - 1
         binwidths = 2 * M / nbins
         return binwidths
 

@@ -74,12 +74,12 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
         values = np.array([-2, 2, 2, -2, 2])
         nbits = np.array([0, 0, 0, 1, 1])
 
-        self.set_zero_bits_strategy('min_one')
+        self.set_zero_bits_strategy('min-one')
         indices = self.mixin.quantize(values, nbits)
         expected = np.array([0, 1, 1, 0, 1])
         np.testing.assert_array_equal(indices, expected)
 
-        self.set_zero_bits_strategy('read_zero')
+        self.set_zero_bits_strategy('read-zero')
         indices = self.mixin.quantize(values, nbits)
         expected = np.array([0, 0, 0, 0, 1])
         np.testing.assert_array_equal(indices, expected)
@@ -89,12 +89,12 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
         indices = np.array([0, 0, 0, 0, 1])
         nbits = np.array([0, 0, 0, 1, 1])
 
-        self.set_zero_bits_strategy('min_one')
+        self.set_zero_bits_strategy('min-one')
         values = self.mixin.unquantize(indices, nbits)
         expected = np.array([-2, -2, -2, -2, 2], dtype=float)
         np.testing.assert_array_equal(values, expected)
 
-        self.set_zero_bits_strategy('read_zero')
+        self.set_zero_bits_strategy('read-zero')
         values = self.mixin.unquantize(indices, nbits)
         expected = np.array([0, 0, 0, -2, 2], dtype=float)
         np.testing.assert_array_equal(values, expected)
