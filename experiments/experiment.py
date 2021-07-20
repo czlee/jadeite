@@ -70,7 +70,24 @@ class BaseExperiment:
             help="Batch size")
         parser.add_argument("--cpu", action="store_true", default=False,
             help="Force use of CPU (i.e. don't use CUDA)")
-        parser.set_defaults(**cls.default_params)
+
+        # Set defaults, but only if it's in both cls.default_params and the parser's arguments
+        arg_names = vars(parser.parse_args([])).keys()  # get all existing arguments
+        common_names = set(arg_names) & set(cls.default_params.keys())
+        defaults = {key: cls.default_params[key] for key in common_names}
+        parser.set_defaults(**defaults)
+
+    @classmethod
+    def extract_params_from_args(cls, args, ignore_missing=[]):
+        params = {}
+        args_dict = vars(args)
+        for key in cls.default_params.keys():
+            if key in args_dict:
+                params[key] = args_dict[key]
+            elif key not in ignore_missing:
+                logger.warning(f"Parameter not found in arguments passed to {cls.__name__}: {key}")
+        logger.debug("Extracted parameters: " + str(params))
+        return params
 
     def log_model_json(self, seq, model):
         """Writes the model parameters of the given model to a file in the
@@ -209,10 +226,7 @@ class SimpleExperiment(BaseExperiment):
         """
         device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
         optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-        params = {
-            'epochs': args.epochs,
-            'batch_size': args.batch_size,
-        }
+        params = cls.extract_params_from_args(args)
         return cls(train_dataset, test_dataset, model, loss_fn, metric_fns,
                    optimizer, results_dir, device, **params)
 

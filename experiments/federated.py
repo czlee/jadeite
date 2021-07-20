@@ -137,11 +137,7 @@ class BaseFederatedExperiment(BaseExperiment):
             for model in client_models
         ]
 
-        params = {
-            'epochs': args.epochs,
-            'batch_size': args.batch_size,
-            'rounds': args.rounds,
-        }
+        params = cls.extract_params_from_args(args)
 
         return cls(client_datasets, test_dataset, client_models, global_model, loss_fn, metric_fns,
                    client_optimizers, results_dir, device, **params)
