@@ -41,11 +41,17 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # take note of number of model parameters
+        flattened = self.flatten_state_dict(self.global_model.state_dict())
+        self.nparams = flattened.numel()
+
         if self.params['channel_uses'] is None:
             # override with the number of parameters to estimate
-            flattened = self.flatten_state_dict(self.global_model.state_dict())
-            self.params['channel_uses'] = flattened.numel()
-            logger.debug("Setting number of channel uses to: " + str(self.params['channel_uses']))
+            self.params['channel_uses'] = self.nparams
+            logger.debug(f"Setting number of channel uses to: {self.params['channel_uses']}")
+
+        logger.info(f"Number of bits available per channel use: {self.bits}")
+        logger.info(f"Number of bits available in total: {self.bits * self.params['channel_uses']}")
 
     @property
     def bits(self):
@@ -86,6 +92,11 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         transmissions = [self.client_transmit(model) for model in self.client_models]
         self.server_receive(transmissions)
 
+    def log_evaluation(self, evaluation_dict):
+        evaluation_dict['bits_per_channel_use'] = self.bits
+        evaluation_dict['bits_per_round'] = self.bits * self.params['channel_uses']
+        return super().log_evaluation(evaluation_dict)
+
 
 class SimpleStochasticQuantizationMixin:
     """Mixin for stochastic quantization functionality.
@@ -107,6 +118,7 @@ class SimpleStochasticQuantizationMixin:
 
     default_params_to_add = {
         'quantization_range': 1.0,
+        'zero_bits_strategy': 'min-one',
     }
 
     @classmethod
@@ -116,7 +128,30 @@ class SimpleStochasticQuantizationMixin:
         """
         parser.add_argument("-M", "--quantization-range", type=float,
             help="Quantization range, [-M, M]")
+        parser.add_argument("--zero-bits-strategy", choices=['min-one', 'read-zero'],
+            help="What to do if there aren't enough bits (min-one = require at "
+                 "least one bit per parameter, even if it violates the power "
+                 "constraint; read-zero = interpret parameters without bits as "
+                 "zero)")
         super().add_arguments(parser)
+
+    def _binwidths(self, nbits: np.ndarray) -> np.ndarray:
+        """Convenience function to compute bin widths relating to `nbits`.
+        Elements corresponding to `nbits == 0` are returned as `np.nan`, unless
+        `self.params['zero_bits_strategy'] == 'min_one'`, in which case they are
+        treated as if `nbits` were 1."""
+        assert issubclass(nbits.dtype.type, np.integer)
+
+        M = self.params['quantization_range']  # noqa: N806
+        nbits = nbits.astype(float)
+        if self.params['zero_bits_strategy'] == 'min-one':
+            nbits = np.maximum(nbits, 1)
+        elif self.params['zero_bits_strategy'] == 'read-zero':
+            nbits[nbits == 0] = np.nan
+
+        nbins = (2 ** nbits - 1).astype(float)
+        binwidths = 2 * M / nbins
+        return binwidths
 
     def quantize(self, values: np.ndarray, nbits: np.ndarray) -> np.ndarray:
         """Quantizes the given `values` to the corresponding number of bits in
@@ -133,18 +168,21 @@ class SimpleStochasticQuantizationMixin:
           2      0     1 w.p. 0.5, 2 w.p. 0.5    1 means -5/3,  2 means 5/3
           2      4     2 w.p. 0.3, 3 w.p. 0.7    2 means  5/3,  3 means 5
           3     -1     2 w.p. 0.2, 3 w.p. 0.8    2 means -15/7, 3 means -5/7
+
+        If nbits is 0, the corresponding index returned is always 0, and should
+        be interpreted to mean 0.
         """
+        assert values.shape == nbits.shape, f"shape mismatch: {nbits.shape} vs {nbits.shape}"
         M = self.params['quantization_range']  # noqa: N806
 
-        assert issubclass(nbits.dtype.type, np.integer)
-        nbins = 2 ** nbits - 1
+        binwidths = self._binwidths(nbits)
         clipped = values.clip(-M, M)
-        binwidth = 2 * M / nbins              # width of bins
-        scaled = (clipped + M) / binwidth     # scaled to 0:nbins
-        lower = np.floor(scaled).astype(int)  # rounded down
+        scaled = (clipped + M) / binwidths    # scaled to 0:nbins
+        lower = np.floor(scaled)              # rounded down
         remainder = scaled - lower            # probability we want to round up
         round_up = np.random.rand(remainder.size) < remainder
-        indices = lower + round_up
+        indices = (lower + round_up).astype(int)
+        indices[np.isnan(binwidths)] = 0      # override special case
         return indices
 
     def unquantize(self, indices: np.ndarray, nbits: np.ndarray) -> np.ndarray:
@@ -152,6 +190,7 @@ class SimpleStochasticQuantizationMixin:
         indices. For example, if M = 5:
 
         nbits  index  returns value
+          0      0          0
           1      0         -5
           1      1          5
           2      2          5/3
@@ -161,11 +200,11 @@ class SimpleStochasticQuantizationMixin:
         "unquantize" or undo a reduction in information. But the point is that
         it transforms the indices back to a usable space.)
         """
+        assert indices.shape == nbits.shape, f"shape mismatch: {indices.shape} vs {nbits.shape}"
         M = self.params['quantization_range']  # noqa: N806
-        assert issubclass(nbits.dtype.type, np.integer)
-        nbins = 2 ** nbits - 1
-        binwidth = 2 * M / nbins
-        values = indices * binwidth - M
+        binwidths = self._binwidths(nbits)
+        values = indices * binwidths - M
+        values[np.isnan(binwidths)] = 0        # override special case
         return values
 
 
@@ -193,31 +232,42 @@ class SimpleQuantizationFederatedExperiment(
     default_params = BaseDigitalFederatedExperiment.default_params.copy()
     default_params.update(SimpleStochasticQuantizationMixin.default_params_to_add)
 
-    def transmit_and_aggregate(self, records: dict):
+    def run(self):
         self.cursor = 0
+        super().run()
+
+    def transmit_and_aggregate(self, records: dict):
+        self.bits_per_channel = self.advance_bits_per_channel()
         super().transmit_and_aggregate(records)
 
-    def divide_bits_per_channel(self):
+    def advance_bits_per_channel(self):
         """Returns a list of the number of bits each model parameter (in the
-        state dict) should use.
+        state dict) should use. This evenly divides the total number of bits
+        available (being `self.bits * self.params['channel_uses']`) among the
+        number of model parameters (i.e., numbers to be sent). The leftover bits
+        are allocated on a rotating basis, tracked by `self.cursor`.
         """
         s = self.params['channel_uses']
-        total_bits = self.bits * s
-        lengths = [total_bits // s] * s
-        nspare = total_bits - sum(lengths)
-        for i in range(self.cursor, self.cursor + nspare):
-            lengths[i % s] += 1
-        self.cursor = (self.cursor + nspare) % s
+        d = self.nparams
+        total_bits = int(self.bits * s)
+        lengths = np.ones((1, d), dtype=int) * (total_bits // d)
+        nspare = total_bits - lengths.sum()
+        extra_locations = np.arange(self.cursor, self.cursor + nspare) % d
+        lengths[0, extra_locations] += 1
+        assert lengths.sum() == total_bits
+        self.cursor = (self.cursor + nspare) % d
         return lengths
 
     def client_transmit(self, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
-        lengths = self.divide_bits_per_channel()
-        assert len(values) == len(lengths)
-        indices = self.quantize(values, lengths)
+        lengths = self.bits_per_channel
+        assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
+        indices = self.quantize(values.numpy(), lengths)
         return torch.Tensor(indices)
 
     def server_receive(self, transmissions):
-        lengths = self.divide_bits_per_channel()
-        unquantized = [self.unquantize(indices, lengths) for indices in transmissions]
-        self.update_global_model(unquantized)
+        lengths = self.bits_per_channel
+        unquantized = [self.unquantize(indices.numpy(), lengths) for indices in transmissions]
+        unquantized = [torch.Tensor(x) for x in unquantized]
+        client_average = torch.stack(unquantized, 0).mean(0)
+        self.update_global_model(client_average)

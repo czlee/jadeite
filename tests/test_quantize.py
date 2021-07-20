@@ -14,9 +14,13 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
 
     def setUp(self):
         self.mixin = SimpleStochasticQuantizationMixin()
+        self.mixin.params = self.mixin.default_params_to_add.copy()
 
     def set_quantization_range(self, m):
-        self.mixin.params = {'quantization_range': m}
+        self.mixin.params['quantization_range'] = m
+
+    def set_zero_bits_strategy(self, strategy):
+        self.mixin.params['zero_bits_strategy'] = strategy
 
     def test_quantize_basic(self):
         """Simple sanity checks."""
@@ -64,3 +68,33 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
 
         diffs = np.abs(values - averages)
         np.testing.assert_array_less(diffs, deltas)
+
+    def test_quantize_zero_bits(self):
+        self.set_quantization_range(2)
+        values = np.array([-2, 2, 2, -2, 2])
+        nbits = np.array([0, 0, 0, 1, 1])
+
+        self.set_zero_bits_strategy('min_one')
+        indices = self.mixin.quantize(values, nbits)
+        expected = np.array([0, 1, 1, 0, 1])
+        np.testing.assert_array_equal(indices, expected)
+
+        self.set_zero_bits_strategy('read_zero')
+        indices = self.mixin.quantize(values, nbits)
+        expected = np.array([0, 0, 0, 0, 1])
+        np.testing.assert_array_equal(indices, expected)
+
+    def test_unquantize_zero_bits(self):
+        self.set_quantization_range(2)
+        indices = np.array([0, 0, 0, 0, 1])
+        nbits = np.array([0, 0, 0, 1, 1])
+
+        self.set_zero_bits_strategy('min_one')
+        values = self.mixin.unquantize(indices, nbits)
+        expected = np.array([-2, -2, -2, -2, 2], dtype=float)
+        np.testing.assert_array_equal(values, expected)
+
+        self.set_zero_bits_strategy('read_zero')
+        values = self.mixin.unquantize(indices, nbits)
+        expected = np.array([0, 0, 0, -2, 2], dtype=float)
+        np.testing.assert_array_equal(values, expected)
