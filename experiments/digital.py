@@ -10,6 +10,7 @@ loss functions and optimizers. They take care of training, testing and logging.
 from math import log2
 from typing import Sequence
 
+import numpy as np
 import torch
 
 from .federated import BaseFederatedExperiment
@@ -71,15 +72,22 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         self.server_receive(transmissions)
 
 
-class StochasticQuantizationMixin:
+class SimpleStochasticQuantizationMixin:
     """Mixin for stochastic quantization functionality.
 
     This quantization uses evenly spaced bins within a symmetric quantization
-    range [-M, M]. The parameter `M` must be specified as the
-    `quantization_range` in the parameters. For values within [-M, M],
-    quantization is either up or down randomly, so that it is equal in
+    range [-M, M]. It has no adaptive intelligence. The parameter `M` must be
+    specified as the `quantization_range` in the parameters. For values within
+    [-M, M], quantization is either up or down randomly, so that it is equal in
     expectation to the true value. Values outside [-M, M] will just be pulled
-    back to the range boundary, i.e., -M or M.
+    back to the range boundary, i.e., -M or M. See the docstring for the
+    `quantize()` method for details.
+
+    There are unit tests for this mixin, see tests/test_quantize.py or invoke
+    from the repository root directory:
+
+        python -m unittest tests.test_quantize
+
     """
 
     default_params_to_add = {
@@ -95,29 +103,60 @@ class StochasticQuantizationMixin:
             help="Quantization range, [-M, M]")
         super().add_arguments(parser)
 
-    def quantize(self, value: float, nbits: int):
-        """Quantizes the given `value` to `nbits` bits.
+    def quantize(self, values: np.ndarray, nbits: np.ndarray) -> np.ndarray:
+        """Quantizes the given `values` to the corresponding number of bits in
+        `nbits`. The two arrays passed in must be the same size.
 
         To quantize, the range [-M, M], where `M` is the `quantization_range`
         parameter, is divided equally into `2 ** nbits - 1` bins. For example,
         if M = 5:
 
-            With nbits =
+        nbits  value   returns indices           bin values
+          1      0     0 w.p. 0.5, 1 w.p. 0.5    0 means -5,    1 means 5
+          1      3     0 w.p. 0.2, 1 w.p. 0.8    0 means -5,    1 means 5
+          1      8     1 w.p. 1                  1 means 5
+          2      0     1 w.p. 0.5, 2 w.p. 0.5    1 means -5/3,  2 means 5/3
+          2      4     2 w.p. 0.3, 3 w.p. 0.7    2 means  5/3,  3 means 5
+          3     -1     2 w.p. 0.2, 3 w.p. 0.8    2 means -15/7, 3 means -5/7
         """
-        M = self.params['parameter_range']  # noqa: N806
-        nbins = 2 ** int(nbits) - 1
-        if value < -M:
-            return 0
-        if value > M:
-            return nbins
+        M = self.params['quantization_range']  # noqa: N806
+
+        assert issubclass(nbits.dtype.type, np.integer)
+        nbins = 2 ** nbits - 1
+        clipped = values.clip(-M, M)
+        binwidth = 2 * M / nbins              # width of bins
+        scaled = (clipped + M) / binwidth     # scaled to 0:nbins
+        lower = np.floor(scaled).astype(int)  # rounded down
+        remainder = scaled - lower            # probability we want to round up
+        round_up = np.random.rand(remainder.size) < remainder
+        indices = lower + round_up
+        return indices
+
+    def unquantize(self, indices: np.ndarray, nbits: np.ndarray) -> np.ndarray:
+        """Returns the scaled quantized values corresponding to the given
+        indices. For example, if M = 5:
+
+        nbits  index  returns value
+          1      0         -5
+          1      1          5
+          2      2          5/3
+          3      1         -25/7
+
+        (The method name is a bit of a misnomer. You obviously can't
+        "unquantize" or undo a reduction in information. But the point is that
+        it transforms the indices back to a usable space.)
+        """
+        M = self.params['quantization_range']  # noqa: N806
+        assert issubclass(nbits.dtype.type, np.integer)
+        nbins = 2 ** nbits - 1
         binwidth = 2 * M / nbins
-        scaled = (value + M) / binwidth  # noqa: F841 work in progress
-
-    def unquantize(self, value, nbits):
-        pass
+        values = indices * binwidth - M
+        return values
 
 
-class SimpleQuantizationFederatedExperiment(StochasticQuantizationMixin, BaseDigitalFederatedExperiment):
+class SimpleQuantizationFederatedExperiment(
+        SimpleStochasticQuantizationMixin,
+        BaseDigitalFederatedExperiment):
     """Digital federated experiment that quantizes each component of the model
     to the number of bits available for that component. Bits are allocated using
     the following simple (and presumably inefficient) strategy: If the number of
@@ -137,7 +176,7 @@ class SimpleQuantizationFederatedExperiment(StochasticQuantizationMixin, BaseDig
     components. (This will probably change in a near-future implementation.)"""
 
     default_params = BaseDigitalFederatedExperiment.default_params.copy()
-    default_params.update(StochasticQuantizationMixin.default_params_to_add)
+    default_params.update(SimpleStochasticQuantizationMixin.default_params_to_add)
 
     def transmit_and_aggregate(self, records: dict):
         self.cursor = 0

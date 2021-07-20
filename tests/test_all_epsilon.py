@@ -21,6 +21,9 @@ Then use `head` to grab a few hundred lines from the full files. For example:
     tail epsilon_normalized.t.full -n 200 > epsilon_normalized.t
 """
 
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
+
 import argparse
 import json
 import logging
