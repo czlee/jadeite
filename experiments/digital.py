@@ -7,6 +7,7 @@ loss functions and optimizers. They take care of training, testing and logging.
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
 
+import logging
 from math import log2
 from typing import Sequence
 
@@ -14,6 +15,8 @@ import numpy as np
 import torch
 
 from .federated import BaseFederatedExperiment
+
+logger = logging.getLogger(__name__)
 
 
 class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
@@ -32,7 +35,17 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
     default_params.update({
         'noise': 1.0,
         'power': 1.0,
+        'channel_uses': None,
     })
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.params['channel_uses'] is None:
+            # override with the number of parameters to estimate
+            flattened = self.flatten_state_dict(self.global_model.state_dict())
+            self.params['channel_uses'] = flattened.numel()
+            logger.debug("Setting number of channel uses to: " + str(self.params['channel_uses']))
 
     @property
     def bits(self):
@@ -51,6 +64,8 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
             help="Noise level (variance), σₙ²")
         parser.add_argument("-P", "--power", type=float,
             help="Power level, P")
+        parser.add_argument("-s", "--channel-uses", type=float,
+            help="Number of channel uses (default: same as number of model components)")
 
         super().add_arguments(parser)
 
@@ -182,26 +197,27 @@ class SimpleQuantizationFederatedExperiment(
         self.cursor = 0
         super().transmit_and_aggregate(records)
 
-    def divide_bits_per_channel(self, ncomponents):
-        total_bits = self.bits * ncomponents
-        lengths = [total_bits // ncomponents] * ncomponents
+    def divide_bits_per_channel(self):
+        """Returns a list of the number of bits each model parameter (in the
+        state dict) should use.
+        """
+        s = self.params['channel_uses']
+        total_bits = self.bits * s
+        lengths = [total_bits // s] * s
         nspare = total_bits - sum(lengths)
         for i in range(self.cursor, self.cursor + nspare):
-            lengths[i % ncomponents] += 1
-        self.cursor = (self.cursor + nspare) % ncomponents
+            lengths[i % s] += 1
+        self.cursor = (self.cursor + nspare) % s
         return lengths
 
     def client_transmit(self, model: torch.nn.Module) -> torch.Tensor:
-        values = self.flatten_state_dict(model)
-        lengths = self.divide_bits_per_channel(values.numel())
+        values = self.get_values_to_send(model)
+        lengths = self.divide_bits_per_channel()
         assert len(values) == len(lengths)
+        indices = self.quantize(values, lengths)
+        return torch.Tensor(indices)
 
-        transmissions = []  # noqa: F841 work in progress
-        for value, k in zip(values, lengths):
-            pass
-
-    # things that need to happen
-    #  - how do we quantize? like what maximum/range do we assume?
-    #    do we randomize rounding direction?
-    #  - probably best to add option to send deltas rather than quantities
-    #  - scale step size to utilize all power
+    def server_receive(self, transmissions):
+        lengths = self.divide_bits_per_channel()
+        unquantized = [self.unquantize(indices, lengths) for indices in transmissions]
+        self.update_global_model(unquantized)

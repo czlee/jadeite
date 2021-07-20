@@ -2,6 +2,14 @@
 
 Experiment classes are supposed to be, as far as possible, agnostic to models,
 loss functions and optimizers. They take care of training, testing and logging.
+
+Note on parameter/`state_dict` distinction: Currently, this implementation
+treats all members of the `state_dict` as parameters that need to be
+communicated over the network, whether or not they are model parameters (or e.g.
+buffers). It seems sensible to me to sync all of the `state_dict`, but I'm not
+100% sure if this is actually what needs to happen, so if I later discover that
+this is mistaken, this implementation may change to send only elements in
+`model.parameters()`.
 """
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
