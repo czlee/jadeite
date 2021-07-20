@@ -41,8 +41,12 @@ from experiments import FederatedAveragingExperiment, OverTheAirExperiment, Simp
 class TestAllExperimentsWithEpsilon(unittest.TestCase):
 
     def setUp(self):
-        self.train_dataset = epsilon.EpsilonDataset(train=True, small=True, verbose=False)
-        self.test_dataset = epsilon.EpsilonDataset(train=False, small=True, verbose=False)
+        try:
+            self.train_dataset = epsilon.EpsilonDataset(train=True, small=True, verbose=False)
+            self.test_dataset = epsilon.EpsilonDataset(train=False, small=True, verbose=False)
+        except FileNotFoundError:
+            raise unittest.SkipTest
+
         self.results_dir = Path("/tmp/jadeite-test")
         self.results_dir.mkdir(exist_ok=True)
         logging.basicConfig(filename=self.results_dir / "output.log", level=logging.DEBUG, force=True)
