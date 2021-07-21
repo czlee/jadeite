@@ -4,6 +4,8 @@
 # Q000 Remove bad quotes
 ignore = E128,Q000
 
+exclude = venv, jupyter
+
 max-line-length = 105
 import-order-style = edited
 application-import-names = data, experiments, metrics, utils
