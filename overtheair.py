@@ -11,7 +11,7 @@ import torch
 
 import data.epsilon as epsilon
 import metrics
-import results
+import utils
 from experiments import OverTheAirExperiment
 
 
@@ -22,8 +22,8 @@ parser.add_argument("--small", action="store_true", default=False,
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s | %(message)s")
-results_dir = results.create_results_directory()
-results.log_arguments(args, results_dir)
+results_dir = utils.create_results_directory()
+utils.log_arguments(args, results_dir)
 
 train_dataset = epsilon.EpsilonDataset(train=True, small=args.small)
 test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)

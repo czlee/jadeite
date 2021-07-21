@@ -58,8 +58,18 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY, latest_symlink=
     return path
 
 
-def log_arguments(args, results_dir, other_info=None):
+def log_arguments(args, results_dir: Path, other_info=None):
+    """Logs the arguments (presumably from the command line) to the file
+    "arguments.json". This helps keep a full record of what the experiment was,
+    in case there's later any doubt about what experiment runs represent, or
+    their reliability.
 
+    `results_dir` should be a `pathlib.Path` object reflecting where results for
+    this experiment are being saved.
+
+    If `other_info` is provided, it will be inserted into the file under the key
+    "other".
+    """
     info = {}
     info['script'] = sys.argv[0]
     info['started'] = datetime.datetime.now().isoformat()
@@ -93,7 +103,13 @@ def log_arguments(args, results_dir, other_info=None):
         json.dump(info, f, indent=2)
 
 
-def log_evaluation(eval_dict, results_dir):
+def log_evaluation(eval_dict, results_dir: Path):
+    """Logs the given `eval_dict` to the file `evaluation.json`. This function
+    also adds a timestamp under the key "finished".
+
+    `results_dir` should be a `pathlib.Path` object reflecting where results for
+    this experiment are being saved.
+    """
     filename = results_dir / "evaluation.json"
     eval_dict['finished'] = datetime.datetime.now().isoformat()
     with open(filename, 'w') as f:
@@ -101,9 +117,9 @@ def log_evaluation(eval_dict, results_dir):
 
 
 class CsvLogger:
-    """Similar to `tf.keras.callbacks.CsvLogger`, but to be called from
-    iterative process loops. Also, doesn't implement the functionality we don't
-    need."""
+    """CSV logger specialised for our purposes. It takes dicts, and the first
+    row will be headers.
+    """
 
     def __init__(self, filename, index_field='epoch'):
         self.filename = filename
@@ -136,13 +152,15 @@ class CsvLogger:
         self.csv_file.close()
 
 
-if __name__ == "__main__":
-    # for debugging arguments.txt only
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--test-argument", default=42)
-    parser.add_argument("--test-argument-2", default=False, action='store_true')
-    args = parser.parse_args()
-
-    results_dir = create_results_directory()
-    log_arguments(args, results_dir)
+def divide_integer_evenly(n, m):
+    """Returns a list of `m` integers summing to `n`, with elements as even as
+    possible. For example:
+    ```
+        divide_integer_evenly(10, 4)  ->  [3, 3, 2, 2]
+        divide_integer_evenly(20, 3)  ->  [7, 6, 6]
+    ```
+    """
+    lengths = [n // m] * m
+    for i in range(n - sum(lengths)):
+        lengths[i] += 1
+    return lengths

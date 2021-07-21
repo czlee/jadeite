@@ -16,7 +16,7 @@ from typing import Callable, Dict
 
 import torch
 
-import results
+import utils
 
 logger = logging.getLogger(__name__)
 
@@ -106,11 +106,11 @@ class BaseExperiment:
             json.dump(states, f, indent=2)
 
     def log_evaluation(self, evaluation_dict):
-        results.log_evaluation(evaluation_dict, self.results_dir)
+        utils.log_evaluation(evaluation_dict, self.results_dir)
 
     def get_csv_logger(self, filename, **kwargs):
         logfile = self.results_dir / 'training.csv'
-        return results.CsvLogger(logfile, **kwargs)
+        return utils.CsvLogger(logfile, **kwargs)
 
     def show_progress(self, *args, **kwargs):
         if logger.getEffectiveLevel() <= logging.INFO:

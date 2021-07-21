@@ -11,7 +11,7 @@ import torch
 
 import data.epsilon as epsilon
 import metrics
-import results
+import utils
 from experiments import SimpleQuantizationFederatedExperiment
 
 
@@ -26,8 +26,8 @@ parser.add_argument("-q", "--repeat", type=int, default=1,
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s | %(message)s")
-top_results_dir = results.create_results_directory()
-results.log_arguments(args, top_results_dir)
+top_results_dir = utils.create_results_directory()
+utils.log_arguments(args, top_results_dir)
 
 train_dataset = epsilon.EpsilonDataset(train=True, small=args.small)
 test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)
@@ -42,7 +42,7 @@ for i in range(args.repeat):
         print(f"=== Iteration {i} of {args.repeat}, {n} clients ===")
         results_dir = top_results_dir / f"clients-{n}-iteration-{i}"
         results_dir.mkdir()
-        results.log_arguments(args, results_dir, other_info={'iteration': i, 'clients': n})
+        utils.log_arguments(args, results_dir, other_info={'iteration': i, 'clients': n})
         experiment = SimpleQuantizationFederatedExperiment.from_arguments(
             train_dataset, test_dataset, epsilon.EpsilonLogisticModel,
             loss_fn, metric_fns, results_dir, args)

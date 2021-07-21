@@ -23,7 +23,7 @@ from typing import Callable, Dict, Sequence
 
 import torch
 
-import data.utils
+import utils
 
 from .experiment import BaseExperiment
 
@@ -128,7 +128,7 @@ class BaseFederatedExperiment(BaseExperiment):
 
         data_per_client = args.data_per_client
         if data_per_client is None:
-            client_lengths = data.utils.divide_integer_evenly(len(train_dataset), nclients)
+            client_lengths = utils.divide_integer_evenly(len(train_dataset), nclients)
         else:
             if data_per_client * nclients > len(train_dataset):
                 raise ValueError(f"There isn't enough data ({len(train_dataset)}) to get "
