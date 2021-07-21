@@ -253,7 +253,7 @@ class SimpleQuantizationFederatedExperiment(
         s = self.params['channel_uses']
         d = self.nparams
         total_bits = int(self.bits * s)
-        lengths = torch.ones((1, d), dtype=torch.int64, device=self.device) * (total_bits // d)
+        lengths = torch.full((1, d), total_bits // d, dtype=torch.int64, device=self.device)
         nspare = total_bits - lengths.sum()
         extra_locations = torch.arange(self.cursor, self.cursor + nspare, device=self.device) % d
         lengths[0, extra_locations] += 1
