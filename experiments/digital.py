@@ -182,7 +182,10 @@ class SimpleStochasticQuantizationMixin:
         scaled = (clipped + M) / binwidths    # scaled to 0:nbins
         lower = torch.floor(scaled)           # rounded down
         remainder = scaled - lower            # probability we want to round up
-        assert remainder.ge(0).all() and remainder.le(1).all()
+
+        assert torch.logical_or(torch.logical_and(remainder.ge(0), remainder.le(1)),
+                                remainder.isnan()).all(), remainder
+
         round_up = torch.rand_like(remainder) < remainder
         indices = (lower + round_up).type(torch.int64)
         indices[binwidths.isnan()] = 0      # override special case
@@ -257,7 +260,8 @@ class SimpleQuantizationFederatedExperiment(
         nspare = total_bits - lengths.sum()
         extra_locations = torch.arange(self.cursor, self.cursor + nspare, device=self.device) % d
         lengths[0, extra_locations] += 1
-        assert lengths.sum() == total_bits
+        assert lengths.sum() == total_bits, repr(lengths)
+        assert lengths.max() - lengths.min() <= 1, repr(lengths)
         self.cursor = (self.cursor + nspare) % d
         return lengths
 
