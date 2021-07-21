@@ -11,7 +11,6 @@ import logging
 from math import log2
 from typing import Sequence
 
-import numpy as np
 import torch
 
 from .federated import BaseFederatedExperiment
@@ -135,25 +134,28 @@ class SimpleStochasticQuantizationMixin:
                  "zero)")
         super().add_arguments(parser)
 
-    def _binwidths(self, nbits: np.ndarray) -> np.ndarray:
+    def _binwidths(self, nbits: torch.Tensor) -> torch.Tensor:
         """Convenience function to compute bin widths relating to `nbits`.
-        Elements corresponding to `nbits == 0` are returned as `np.nan`, unless
+        Elements corresponding to `nbits == 0` are returned as NaN, unless
         `self.params['zero_bits_strategy'] == 'min_one'`, in which case they are
-        treated as if `nbits` were 1."""
-        assert issubclass(nbits.dtype.type, np.integer)
+        treated as if `nbits` were 1.
+
+        `nbits` doesn't have to be of an integer dtype, but it does need to
+        contain only integers."""
+        nbits = nbits.type(torch.float64)
+        assert torch.equal(nbits, nbits.floor())
 
         M = self.params['quantization_range']  # noqa: N806
-        nbits = nbits.astype(float)
         if self.params['zero_bits_strategy'] == 'min-one':
-            nbits = np.maximum(nbits, 1)
+            nbits = torch.maximum(nbits, torch.ones_like(nbits))
         elif self.params['zero_bits_strategy'] == 'read-zero':
-            nbits[nbits == 0] = np.nan
+            nbits[nbits == 0] = float('nan')
 
         nbins = 2 ** nbits - 1
         binwidths = 2 * M / nbins
         return binwidths
 
-    def quantize(self, values: np.ndarray, nbits: np.ndarray) -> np.ndarray:
+    def quantize(self, values: torch.Tensor, nbits: torch.Tensor) -> torch.Tensor:
         """Quantizes the given `values` to the corresponding number of bits in
         `nbits`. The two arrays passed in must be the same size.
 
@@ -178,14 +180,14 @@ class SimpleStochasticQuantizationMixin:
         binwidths = self._binwidths(nbits)
         clipped = values.clip(-M, M)
         scaled = (clipped + M) / binwidths    # scaled to 0:nbins
-        lower = np.floor(scaled)              # rounded down
+        lower = torch.floor(scaled)              # rounded down
         remainder = scaled - lower            # probability we want to round up
-        round_up = np.random.rand(remainder.size) < remainder
-        indices = (lower + round_up).astype(int)
-        indices[np.isnan(binwidths)] = 0      # override special case
+        round_up = torch.rand(remainder.size()) < remainder
+        indices = (lower + round_up).type(torch.int64)
+        indices[binwidths.isnan()] = 0      # override special case
         return indices
 
-    def unquantize(self, indices: np.ndarray, nbits: np.ndarray) -> np.ndarray:
+    def unquantize(self, indices: torch.Tensor, nbits: torch.Tensor) -> torch.Tensor:
         """Returns the scaled quantized values corresponding to the given
         indices. For example, if M = 5:
 
@@ -204,7 +206,7 @@ class SimpleStochasticQuantizationMixin:
         M = self.params['quantization_range']  # noqa: N806
         binwidths = self._binwidths(nbits)
         values = indices * binwidths - M
-        values[np.isnan(binwidths)] = 0        # override special case
+        values[binwidths.isnan()] = 0        # override special case
         return values
 
 
@@ -250,9 +252,9 @@ class SimpleQuantizationFederatedExperiment(
         s = self.params['channel_uses']
         d = self.nparams
         total_bits = int(self.bits * s)
-        lengths = np.ones((1, d), dtype=int) * (total_bits // d)
+        lengths = torch.ones((1, d), dtype=torch.int64, device=self.device) * (total_bits // d)
         nspare = total_bits - lengths.sum()
-        extra_locations = np.arange(self.cursor, self.cursor + nspare) % d
+        extra_locations = torch.arange(self.cursor, self.cursor + nspare, device=self.device) % d
         lengths[0, extra_locations] += 1
         assert lengths.sum() == total_bits
         self.cursor = (self.cursor + nspare) % d
@@ -262,12 +264,11 @@ class SimpleQuantizationFederatedExperiment(
         values = self.get_values_to_send(model)
         lengths = self.bits_per_channel
         assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
-        indices = self.quantize(values.numpy(), lengths)
-        return torch.Tensor(indices)
+        indices = self.quantize(values, lengths)
+        return indices
 
     def server_receive(self, transmissions):
         lengths = self.bits_per_channel
-        unquantized = [self.unquantize(indices.numpy(), lengths) for indices in transmissions]
-        unquantized = [torch.Tensor(x) for x in unquantized]
+        unquantized = [self.unquantize(indices, lengths) for indices in transmissions]
         client_average = torch.stack(unquantized, 0).mean(0)
         self.update_global_model(client_average)
