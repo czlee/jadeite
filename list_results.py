@@ -24,6 +24,7 @@ DEFAULT_ARGUMENTS = {
     'parameter_radius': 1.0,
     'small': False,
     'cpu': False,
+    'epochs': 1,
 }
 
 
