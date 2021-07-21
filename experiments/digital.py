@@ -180,9 +180,10 @@ class SimpleStochasticQuantizationMixin:
         binwidths = self._binwidths(nbits)
         clipped = values.clip(-M, M)
         scaled = (clipped + M) / binwidths    # scaled to 0:nbins
-        lower = torch.floor(scaled)              # rounded down
+        lower = torch.floor(scaled)           # rounded down
         remainder = scaled - lower            # probability we want to round up
-        round_up = torch.rand(remainder.size()) < remainder
+        assert remainder.ge(0).all() and remainder.le(1).all()
+        round_up = torch.rand_like(remainder) < remainder
         indices = (lower + round_up).type(torch.int64)
         indices[binwidths.isnan()] = 0      # override special case
         return indices
