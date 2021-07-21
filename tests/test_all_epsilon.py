@@ -67,12 +67,15 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
         constructor of `cls`."""
         parser = argparse.ArgumentParser()
         cls.add_arguments(parser)
-        return parser.parse_args([])
+        if 'clients' in cls.default_params:
+            return parser.parse_args(["--clients", "4"])
+        else:
+            return parser.parse_args([])
 
     def assertFileProduced(self, path):  # noqa: N802
         assert path.exists(), f"Path does not exist: {path}"
         assert path.is_file(), f"Path is not a file: {path}"
-        self.assertGreater(path.stat().st_size, 100)
+        self.assertGreater(path.stat().st_size, 50)
         if path.suffix == '.json':
             # check that json file is well-formed
             with open(path, 'r') as f:
