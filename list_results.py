@@ -182,7 +182,7 @@ for child in children:
         if DEFAULT_ARGUMENTS.get(key) != value or key in args.show
     }
 
-    argsstring = " ".join(f"{key}={value}" for key, value in formatted.items())
+    argsstring = " ".join(f"\033[0;90m{key}=\033[0m{value}" for key, value in formatted.items())
 
     if not has_started(child):
         script = "(?) " + script
@@ -193,4 +193,4 @@ for child in children:
     else:
         color = ""
 
-    print(f"{color}{date} {commit} {script:<21}  {argsstring}\033[0m")
+    print(f"{color}{date} {commit} {script:<21}\033[0m  {argsstring}")

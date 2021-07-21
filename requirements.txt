@@ -1,5 +1,6 @@
 torch
 numpy
+coloredlogs
 
 # these packages are only needed to run the Jupyter notebooks
 jupyterlab

@@ -7,6 +7,7 @@
 import argparse
 import logging
 
+import coloredlogs
 import torch
 
 import data.epsilon as epsilon
@@ -20,7 +21,7 @@ parser.add_argument("--small", action="store_true", default=False,
     help="Use a small dataset for testing")
 args = parser.parse_args()
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s | %(message)s")
+coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(levelname)s %(message)s", milliseconds=True)
 results_dir = utils.create_results_directory()
 utils.log_arguments(args, results_dir)
 

@@ -9,6 +9,7 @@ the automatically created results directory."""
 import argparse
 import logging
 
+import coloredlogs
 import torch
 
 import data.epsilon as epsilon
@@ -27,7 +28,7 @@ parser.add_argument("-q", "--repeat", type=int, default=1,
     help="Number of times to repeat experiment")
 args = parser.parse_args()
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s | %(message)s")
+coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(levelname)s %(message)s", milliseconds=True)
 top_results_dir = utils.create_results_directory()
 utils.log_arguments(args, top_results_dir)
 
