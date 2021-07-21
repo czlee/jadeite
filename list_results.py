@@ -11,6 +11,8 @@ import json
 import re
 from pathlib import Path
 
+import psutil
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
     help="Results directory")
@@ -68,7 +70,7 @@ def process_legacy_arguments(argsfile):
             value = value.strip()
             arguments[key] = value
 
-    return script, started, commit, arguments
+    return script, started, commit, None, arguments
 
 
 def process_arguments(argsfile):
@@ -80,8 +82,28 @@ def process_arguments(argsfile):
     if started is not None:
         started = datetime.datetime.strptime(started, '%Y-%m-%dT%H:%M:%S.%f')
     commit = args_dict.get('git', {}).get('commit', '???    ')[:7]
+    process_id = args_dict.get('process_id')
     arguments = args_dict.get('args', {})
-    return script, started, commit, arguments
+    return script, started, commit, process_id, arguments
+
+
+def format_args_string(arguments):
+    args_items = sorted(arguments.items(), key=lambda k: 0 if k[0] in ['clients', 'repeat'] else 1)
+    formatted_args = [
+        format_argument(key, value) for key, value in args_items
+        if DEFAULT_ARGUMENTS.get(key) != value or key in args.show
+    ]
+    return " ".join(formatted_args)
+
+
+def format_argument(key, value):
+    is_composite = (key == 'clients' and isinstance(value, list)) or key == 'repeat'
+    key = shorten_key_name(key)
+    value = format_arg_value(value)
+    if is_composite:
+        return f"\033[1;36m{key}=\033[0;36m{value}\033[0m"
+    else:
+        return f"\033[0;90m{key}=\033[0m{value}"
 
 
 def shorten_key_name(key):
@@ -153,44 +175,94 @@ def parse_start_time(args):
     return None
 
 
-children = sorted(resultsdir.iterdir())
+def is_composite_directory(arguments):
+    if not arguments:
+        return False
+    if isinstance(arguments.get('clients', None), list):
+        return True
+    if 'repeat' in arguments:
+        return True
+    return False
+
+
+def detect_composite_status(directory, arguments):
+    """Returns a 3-tuple `(unfinished, finished, expected)` where
+    - `unfinished` is the number of directories that exist but have not finished
+    - `finished` is the number of directories that have finished
+
+    It is assumed that the directory is composite, i.e. that
+    `is_composite_directory(directory)` is true.
+    """
+    clients = arguments['clients']
+    repeat = arguments['repeat']
+    finished = 0
+    unfinished = 0
+    expected = len(clients) * repeat
+    for c in clients:
+        for i in range(repeat):
+            childname = f"clients-{c}-iteration-{i}"
+            if has_finished(directory / childname):
+                finished += 1
+            elif (directory / childname).exists():
+                unfinished += 1
+    return unfinished, finished, expected
+
+
+directories = sorted(resultsdir.iterdir())
 start_time = parse_start_time(args)
 if start_time:
-    print("\033[1;36mShowing directories after:", start_time.isoformat(), "\033[0m")
+    print("\033[1;37mShowing directories after:", start_time.isoformat(), "\033[0m")
 
-for child in children:
-    if not child.is_dir():
+for directory in directories:
+    if not directory.is_dir():
         continue
 
-    date = child.name
+    date = directory.name
 
-    if (child / "arguments.json").exists():
-        script, started, commit, arguments = process_arguments(child / "arguments.json")
-    elif (child / "arguments.txt").exists():
-        script, started, commit, arguments = process_legacy_arguments(child / "arguments.txt")
+    if (directory / "arguments.json").exists():
+        info_tuple = process_arguments(directory / "arguments.json")
+    elif (directory / "arguments.txt").exists():
+        info_tuple = process_legacy_arguments(directory / "arguments.txt")
     else:
         if start_time and datetime.datetime.strptime(date, "%Y%m%d-%H%M%S") > start_time:
             print(f"\033[1;31m{date}         ???\033[0m")
         continue
 
+    script, started, commit, process_id, arguments = info_tuple
+
     if start_time and started and started < start_time:
         continue
 
-    formatted = {
-        shorten_key_name(key): format_arg_value(value)
-        for key, value in arguments.items()
-        if DEFAULT_ARGUMENTS.get(key) != value or key in args.show
-    }
+    argsstring = format_args_string(arguments)
+    is_running = process_id is not None and psutil.pid_exists(process_id)
 
-    argsstring = " ".join(f"\033[0;90m{key}=\033[0m{value}" for key, value in formatted.items())
-
-    if not has_started(child):
-        script = "(?) " + script
-        color = "\033[0;31m"
-    elif not has_finished(child):
-        script = "(*) " + script
+    if is_composite_directory(arguments):
+        unfinished, finished, expected = detect_composite_status(directory, arguments)
+        if is_running:
+            color = "\033[0;32m"
+            script = script + f" ({finished}/{expected} r{unfinished})"
+        elif unfinished > 0:
+            # not running, but at least one is unfinished
+            color = "\033[1;35m"
+            script = script + f" ({finished}/{expected} u{unfinished})"
+        elif finished == expected:
+            # seems to be done and dusted
+            color = "\033[1;36m"
+            script = script + f" ({finished}/{expected})"
+        else:
+            # seems to be incomplete but no single run is unfinished
+            color = "\033[1;33m"
+            script = script + f" ({finished}/{expected} u{unfinished})"
+    elif is_running:
+        script = script + " (r)"
         color = "\033[0;32m"
+    elif not has_started(directory):
+        script = script + " (?)"
+        color = "\033[0;31m"
+    elif not has_finished(directory):
+        script = script + " (u)"
+        color = "\033[0;33m"
     else:
         color = ""
 
-    print(f"{color}{date} {commit} {script:<21}\033[0m  {argsstring}")
+    print(f"{color}{date} {commit} {script:<32}\033[0m  {argsstring}")

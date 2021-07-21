@@ -7,6 +7,7 @@ import csv
 import datetime
 import json
 import logging
+import os
 import socket
 import string
 import subprocess
@@ -74,6 +75,7 @@ def log_arguments(args, results_dir: Path, other_info=None):
     info['script'] = sys.argv[0]
     info['started'] = datetime.datetime.now().isoformat()
     info['host'] = socket.gethostname()
+    info['process_id'] = os.getpid()
 
     git = {}
     try:
