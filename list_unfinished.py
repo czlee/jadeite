@@ -1,7 +1,13 @@
 """Lists result directories (including subdirectories in composite directories)
 that appear to be unfinished, and also aren't currently running. Intended to
 assist with result directory cleanup. The output can be piped to `rm -r` to
-quickly delete unfinished experiments."""
+quickly delete unfinished experiments using `xargs`, like this:
+
+  $ python list_unfinished.py | xargs rm -r
+
+but be sure to inspect the output of `python list_unfinished.py` by itself
+before committing to deleting files!
+"""
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
