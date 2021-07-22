@@ -63,8 +63,8 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
         # values (as computed from the scaled binomial distribution)
         deltas = 8 * torch.sqrt(2 * M / (2 ** nbits - 1) / 4 / nsamples)
 
-        self.assertTrue(averages.lt(M).all())
-        self.assertTrue(averages.gt(-M).all())
+        self.assertTrue(averages.le(M).all())
+        self.assertTrue(averages.ge(-M).all())
 
         diffs = torch.abs(values - averages)
         self.assertTrue(torch.lt(diffs, deltas).all())
