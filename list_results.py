@@ -15,6 +15,7 @@ appears still to be running ("r") on this machine. The other status codes are
 
 import argparse
 import datetime
+import itertools
 import json
 import re
 from pathlib import Path
@@ -84,7 +85,7 @@ def process_arguments(argsfile):
 
 
 def format_args_string(arguments):
-    args_items = sorted(arguments.items(), key=lambda k: 0 if k[0] in ['clients', 'repeat'] else 1)
+    args_items = sorted(arguments.items(), key=lambda k: k[0] not in ['clients', 'noise', 'repeat'])
     formatted_args = [
         format_argument(key, value) for key, value in args_items
         if DEFAULT_ARGUMENTS.get(key) != value or key in args.show
@@ -93,7 +94,7 @@ def format_args_string(arguments):
 
 
 def format_argument(key, value):
-    is_composite = (key == 'clients' and isinstance(value, list)) or key == 'repeat'
+    is_composite = (key in ['clients', 'noise'] and isinstance(value, list)) or key == 'repeat'
     key = shorten_key_name(key)
     value = format_arg_value(value)
     if is_composite:
@@ -191,17 +192,26 @@ def detect_composite_status(directory, arguments):
     `is_composite_directory(directory)` is true.
     """
     clients = arguments['clients']
+    noise = arguments.get('noise')
     repeat = arguments['repeat']
     finished = 0
     unfinished = 0
-    expected = len(clients) * repeat
-    for c in clients:
-        for i in range(repeat):
-            childname = f"clients-{c}-iteration-{i}"
-            if has_finished(directory / childname):
-                finished += 1
-            elif (directory / childname).exists():
-                unfinished += 1
+
+    matrix = (range(repeat), clients)
+    expected = repeat * len(clients)
+    childname_template = "clients-{1}-iteration-{0}"
+    if isinstance(noise, list):
+        matrix += (noise,)
+        expected *= len(noise)
+        childname_template = "clients-{1}-noise-{2}-iteration-{0}"
+
+    for values in itertools.product(*matrix):
+        childname = childname_template.format(*values)
+        if has_finished(directory / childname):
+            finished += 1
+        elif (directory / childname).exists():
+            unfinished += 1
+
     return unfinished, finished, expected
 
 
