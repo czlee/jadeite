@@ -13,6 +13,7 @@ from typing import Sequence
 
 import torch
 
+from .analog import ExponentialMovingAverageMixin
 from .federated import BaseFederatedExperiment
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,11 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
                      s            n P
                 k = --- log₂( 1 + --- )
                     2 n            σₙ²
+
+    This base class tracks the number of bits that can be used to represent each
+    model parameter.  Subclasses can (and should) access this in
+    `self.bits_per_tx_parameter`, normally from their implementation of
+    `self.client_transmit()`.
     """
 
     default_params = BaseFederatedExperiment.default_params.copy()
@@ -71,21 +77,51 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
 
         super().add_arguments(parser)
 
-    def client_transmit(self, model: torch.nn.Module) -> torch.Tensor:
-        """Should return a tensor containing the number of bits specified by
-        `self.bits`.  Must be implemented by subclasses."""
+    def run(self):
+        self._bits_cursor = 0
+        super().run()
+
+    def advance_bits_per_tx_parameter(self):
+        """Returns a list of the number of bits each model parameter (in the
+        state dict) should use. This evenly divides the total number of bits
+        available (being `self.bits * self.params['channel_uses']`) among the
+        number of model parameters (i.e., numbers to be sent). The leftover bits
+        are allocated on a rotating basis, tracked by `self._bits_cursor`.
+        """
+        d = self.nparams
+        total_bits = int(self.bits * self.params['channel_uses'])
+        lengths = torch.full((1, d), total_bits // d, dtype=torch.int64, device=self.device)
+        nspare = total_bits - lengths.sum()
+        extras_pos = torch.arange(self._bits_cursor, self._bits_cursor + nspare, device=self.device) % d
+        lengths[0, extras_pos] += 1
+        assert lengths.sum() == total_bits, repr(lengths)
+        assert lengths.max() - lengths.min() <= 1, repr(lengths)
+        self._bits_cursor = (self._bits_cursor + nspare) % d
+        return lengths
+
+    def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
+        """Returns a row tensor containing the number of bits specified by
+        `self.bits`, representing the bits to be transmitted from the client
+        with index `index`. Subclasses must implement this method.
+
+        Subclasses might find `self.bits_per_tx_parameter` useful in their
+        implementation of this method.
+        """
         raise NotImplementedError
 
     def server_receive(self, transmissions: Sequence[torch.Tensor]):
-        """Should update the global `model` given the `transmissions` received
+        """Updates the global `model` given the `transmissions` received
         (errorlessly) from the channel (assumed to be using reliable coding).
-        Must be implemented by subclasses."""
+        Subclasses must implement this method.
+        """
         raise NotImplementedError
 
     def transmit_and_aggregate(self):
         """Transmits model data over the channel as bits, receives the bits
-        errorlessly at the server and updates the model at the server."""
-        transmissions = [self.client_transmit(model) for model in self.client_models]
+        errorlessly at the server and updates the model at the server.
+        """
+        self.bits_per_tx_parameter = self.advance_bits_per_tx_parameter()
+        transmissions = [self.client_transmit(i, model) for i, model in enumerate(self.client_models)]
         self.server_receive(transmissions)
 
     def log_evaluation(self, evaluation_dict):
@@ -95,7 +131,7 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
 
 
 class SimpleStochasticQuantizationMixin:
-    """Mixin for stochastic quantization functionality.
+    """Mixin for simple stochastic quantization functionality.
 
     This quantization uses evenly spaced bins within a symmetric quantization
     range [-qrange, qrange]. The parameter `qrange` must be passed in on every
@@ -113,6 +149,9 @@ class SimpleStochasticQuantizationMixin:
 
         python -m unittest tests.test_quantize
 
+    (The reason this is a mixin is that I could imagine wanting to add other
+    types of quantization, so this would make it easier to swap quantization
+    strategies without affecting other parts of a digital scheme.)
     """
 
     default_params_to_add = {
@@ -238,44 +277,111 @@ class SimpleQuantizationFederatedExperiment(
             help="Quantization range, [-Q, Q]")
         super().add_arguments(parser)
 
-    def run(self):
-        self.cursor = 0
-        super().run()
-
-    def transmit_and_aggregate(self):
-        self.bits_per_channel = self.advance_bits_per_channel()
-        super().transmit_and_aggregate()
-
-    def advance_bits_per_channel(self):
-        """Returns a list of the number of bits each model parameter (in the
-        state dict) should use. This evenly divides the total number of bits
-        available (being `self.bits * self.params['channel_uses']`) among the
-        number of model parameters (i.e., numbers to be sent). The leftover bits
-        are allocated on a rotating basis, tracked by `self.cursor`.
-        """
-        s = self.params['channel_uses']
-        d = self.nparams
-        total_bits = int(self.bits * s)
-        lengths = torch.full((1, d), total_bits // d, dtype=torch.int64, device=self.device)
-        nspare = total_bits - lengths.sum()
-        extra_locations = torch.arange(self.cursor, self.cursor + nspare, device=self.device) % d
-        lengths[0, extra_locations] += 1
-        assert lengths.sum() == total_bits, repr(lengths)
-        assert lengths.max() - lengths.min() <= 1, repr(lengths)
-        self.cursor = (self.cursor + nspare) % d
-        return lengths
-
-    def client_transmit(self, model: torch.nn.Module) -> torch.Tensor:
+    def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
-        lengths = self.bits_per_channel
+        lengths = self.bits_per_tx_parameter
         assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
         qrange = self.params['quantization_range']
         indices = self.quantize(values, lengths, qrange)
         return indices
 
     def server_receive(self, transmissions):
-        lengths = self.bits_per_channel
+        lengths = self.bits_per_tx_parameter
         qrange = self.params['quantization_range']
         unquantized = [self.unquantize(indices, lengths, qrange) for indices in transmissions]
         client_average = torch.stack(unquantized, 0).mean(0)
         self.update_global_model(client_average)
+
+
+class DynamicRangeQuantizationFederatedExperiment(
+        SimpleStochasticQuantizationMixin,
+        ExponentialMovingAverageMixin,
+        BaseDigitalFederatedExperiment):
+    """Digital federated experiment that quantizes each component of the model
+    in a similar manner to `SimpleQuantizationFederatedExperiment`, but that
+    dynamically adjusts the quantization range according to the following (very
+    simple, presumptuous) protocol:
+
+    Each client tracks an exponential moving average of some percentile (say,
+    the 90th) among the parameters it transmits. Every few (say, 5) periods,
+    clients "send" their current moving average values to the server, which
+    itself takes some percentile rank among the clients (say, the 90th
+    percentile), and sends that value back to the clients to be used by all
+    clients as its quantization range.
+
+    The dynamic quantization range is governed by four parameters:
+    - The exponential moving average coefficient is set by the `ema_coefficient`
+      parameter.
+    - The update frequency is set by the `power_update_period` parameter.
+    - The percentile rank is set by the `power_quantile` parameter (and is
+      actually between 0 and 1).
+    """
+
+    default_params = BaseDigitalFederatedExperiment.default_params.copy()
+    default_params.update(SimpleStochasticQuantizationMixin.default_params_to_add)
+    default_params.update(ExponentialMovingAverageMixin.default_params_to_add)
+    default_params.update({
+        'qrange_update_period': 1,
+        'qrange_param_quantile': 0.9,
+        'qrange_client_quantile': 0.9,
+    })
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # check parameter values for sensibility
+        if not (0.0 <= self.params['qrange_param_quantile'] <= 1.0):
+            logger.error("Dynamic quantization range parameter quantile must be between 0 and 1, found: "
+                         f"{self.params['qrange_param_quantile']}")
+        if not (0.0 <= self.params['qrange_client_quantile'] <= 1.0):
+            logger.error("Dynamic quantization range client quantile must be between 0 and 1, found: "
+                         f"{self.params['qrange_client_quantile']}")
+
+        self.current_qrange = 1.0
+
+    @classmethod
+    def add_arguments(cls, parser):
+        qrange_args = parser.add_argument_group(title="Dynamic quantization range parameters")
+        qrange_args.add_argument("-qup", "--qrange-update-period", type=int, metavar="PERIOD",
+            help="Number of rounds between quantization range updates")
+        qrange_args.add_argument("-qpq", "--qrange-param-quantile", type=float, metavar="QUANTILE",
+            help="Quantile among parameters to take to determine quantization range, should "
+                 "generally be between 0 and 1 (normally closer to 1 -- the most conservative "
+                 "option is to take the maximum among parameters) (this is done at each client)")
+        qrange_args.add_argument("-qcq", "--qrange-client-quantile", type=float, metavar="QUANTILE",
+            help="Quantile among clients to take to determine quantization range, should "
+                 "generally be between 0 and 1 (normally closer to 1 -- the most conservative "
+                 "option is to take the maximum among clients)")
+
+        super().add_arguments(parser)
+
+    def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
+        values = self.get_values_to_send(model)
+
+        q = self.params['qrange_param_quantile']
+        value_at_quantile = torch.quantile(values, q).item()
+        self.records['param_quantile'] = value_at_quantile
+        self.update_ema_buffer(client, value_at_quantile)
+
+        lengths = self.bits_per_tx_parameter
+        assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
+        qrange = self.current_qrange
+        indices = self.quantize(values, lengths, qrange)
+        return indices
+
+    def server_receive(self, transmissions):
+        lengths = self.bits_per_tx_parameter
+
+        qrange = self.current_qrange
+        self.records['quantization_range'] = qrange  # take note of quantization range
+
+        unquantized = [self.unquantize(indices, lengths, qrange) for indices in transmissions]
+        client_average = torch.stack(unquantized, 0).mean(0)
+        self.update_global_model(client_average)
+
+        if self.current_round % self.params['qrange_update_period'] == 0:
+            # update the current quantization range by looking at all the clients
+            # (i.e. the clients "sent this information through a side channel")
+            q = self.params['qrange_client_quantile']
+            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
+            self.current_qrange = ema_at_quantile

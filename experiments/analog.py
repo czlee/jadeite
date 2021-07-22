@@ -124,27 +124,31 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
         self.update_global_model(scaled_symbols)
 
 
-class RmsTxValueTrackerMixin:
+class ExponentialMovingAverageMixin:
     """Mixin adding internal tracking of an exponential moving average of the
     root-mean-square of the transmitted vectors.
 
     The exponential moving average (EMA) coefficient is set by the
     `ema_coefficient` parameter, which should be between 0 and 1.
 
-    Subclasses should call `self.add_to_buffer(client, values)` to update the
+    Subclasses should call `self.update_ema_buffer(client, value)` to update the
     EMA. Typically, they'd do so just after calling `self.get_values_to_send()`
     (if the subclass inherits from `BaseFederatedExperiment`).
 
     This mixin just tracks the EMA. It's up to subclasses to figure out what to
-    do with it. Subclasses can access the current EMAs in `self.rms_ema_buffer`,
+    do with it. Subclasses can access the current EMAs in `self.ema_buffer`,
     which is a list of floats with one entry per client, corresponding to the
-    client indices specified in the `self.add_to_buffer(client, values)` call.
+    client indices specified in the `self.update_ema_buffer(client, values)`
+    call.
 
     Subclasses must set `self.nclients` (or inherit from a parent class that
     does so, like `BaseFederatedExperiment`) in its `__init__()`.
 
     This is used by `DynamicPowerOverTheAirExperiment` and
     `experiments.digital.DynamicRangeQuantizationFederatedExperiment`.
+
+    (It would probably make sense for this to permit tracking several EMAs, but
+    we don't have a need for this yet.)
     """
 
     default_params_to_add = {
@@ -159,30 +163,26 @@ class RmsTxValueTrackerMixin:
             logger.warning("EMA coefficient should be between 0 and 1, found: "
                            f"{self.params['ema_coefficient']}")
 
-        self.rms_ema_buffer = [None] * self.nclients
+        self.ema_buffer = [None] * self.nclients
 
     @classmethod
     def add_arguments(cls, parser):
         parser.add_argument("-a", "--ema-coefficient", type=float, metavar="ALPHA",
-            help="Exponential moving average coefficient for dynamic power control, "
-                 "should be between 0 and 1")
+            help="Exponential moving average coefficient, should be between 0 and 1")
         super().add_arguments(parser)
 
-    def add_to_buffer(self, client: int, values: torch.Tensor):
-        rms_value = sqrt(values.square().mean().item())
-
-        if self.rms_ema_buffer[client] is None:  # first value
-            new_ema = rms_value
+    def update_ema_buffer(self, client: int, value: float):
+        if self.ema_buffer[client] is None:  # first value
+            new_ema = value
         else:
             α = self.params['ema_coefficient']
-            new_ema = α * rms_value + (1 - α) * self.rms_ema_buffer[client]
+            new_ema = α * value + (1 - α) * self.ema_buffer[client]
 
-        self.rms_ema_buffer[client] = new_ema
+        self.ema_buffer[client] = new_ema
         self.records[f'ema_client{client}'] = new_ema
-        self.records[f'msg_rms_client{client}'] = rms_value
 
 
-class DynamicPowerOverTheAirExperiment(RmsTxValueTrackerMixin, BaseOverTheAirExperiment):
+class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTheAirExperiment):
     """Like OverTheAirExperiment, but this dynamically scales the parameter
     radius ("B") to try to maintain tx power at around the given power
     constraint, according to the following (very simple, presumptuous) protocol:
@@ -213,9 +213,9 @@ class DynamicPowerOverTheAirExperiment(RmsTxValueTrackerMixin, BaseOverTheAirExp
     """
 
     default_params = BaseOverTheAirExperiment.default_params.copy()
-    default_params.update(RmsTxValueTrackerMixin.default_params_to_add)
+    default_params.update(ExponentialMovingAverageMixin.default_params_to_add)
     default_params.update({
-        'power_update_period': 5,
+        'power_update_period': 1,
         'power_quantile': 0.9,
         'power_factor': 0.9,
     })
@@ -252,7 +252,10 @@ class DynamicPowerOverTheAirExperiment(RmsTxValueTrackerMixin, BaseOverTheAirExp
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
-        self.add_to_buffer(client, values)
+
+        rms_value = sqrt(values.square().mean().item())
+        self.records[f'rms_client{client}'] = rms_value
+        self.update_ema_buffer(client, rms_value)
 
         P = self.params['power']             # noqa: N806
         B = self.current_parameter_radius    # noqa: N806
@@ -279,5 +282,5 @@ class DynamicPowerOverTheAirExperiment(RmsTxValueTrackerMixin, BaseOverTheAirExp
             # (i.e. the clients "sent this information through a side channel")
             q = self.params['power_quantile']
             γ = self.params['power_factor']
-            ema_at_quantile = torch.quantile(torch.tensor(self.rms_ema_buffer), q).item()
+            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
             self.current_parameter_radius = ema_at_quantile / sqrt(γ)

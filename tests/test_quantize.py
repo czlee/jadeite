@@ -50,6 +50,9 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
         quantized = torch.zeros((nsamples, n))
         for i in range(nsamples):
             indices = self.mixin.quantize(values, nbits, qrange)
+            self.assertIn(indices.dtype, [torch.int32, torch.int64])
+            self.assertTrue(indices.le(2 ** nbits - 1).all())
+            self.assertTrue(indices.ge(0).all())
             quantized[i, :] = self.mixin.unquantize(indices, nbits, qrange)
         averages = quantized.mean(axis=0)
 
