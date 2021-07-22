@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Lists results directories with a summary of their contents.
 Useful for quickly inspecting which directory contains which experiments.
 """
