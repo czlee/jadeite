@@ -84,8 +84,16 @@ def process_arguments(argsfile):
     return script, started, commit, process_id, arguments
 
 
+def is_composite_argument(key, value):
+    if key == 'repeat':
+        return True
+    if key in ['clients', 'noise'] and isinstance(value, list):
+        return True
+    return False
+
+
 def format_args_string(arguments):
-    args_items = sorted(arguments.items(), key=lambda k: k[0] not in ['clients', 'noise', 'repeat'])
+    args_items = sorted(arguments.items(), key=lambda item: not is_composite_argument(*item))
     formatted_args = [
         format_argument(key, value) for key, value in args_items
         if DEFAULT_ARGUMENTS.get(key) != value or key in args.show
@@ -94,7 +102,7 @@ def format_args_string(arguments):
 
 
 def format_argument(key, value):
-    is_composite = (key in ['clients', 'noise'] and isinstance(value, list)) or key == 'repeat'
+    is_composite = is_composite_argument(key, value)
     key = shorten_key_name(key)
     value = format_arg_value(value)
     if is_composite:
