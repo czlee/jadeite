@@ -133,6 +133,9 @@ def has_finished(directory):
 
 
 def parse_start_time(args):
+    if args.all:
+        return None
+
     if args.recent is not None:
         pattern = r'^(?:(\d(?:\.\d)?)d)?(?:(\d(?:\.\d)?)h)?$'
         m = re.match(pattern, args.recent)
@@ -198,12 +201,14 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--show", nargs='+', default=[],
         help="Always show these arguments, even if equal to the default")
     when = parser.add_mutually_exclusive_group()
-    when.add_argument("-r", "--recent", type=str, nargs='?', default=None, const='1d',
+    when.add_argument("-r", "--recent", type=str, default='1d',
         help="Only show directories less than a day old, or less than a specified time, "
              "e.g. 2d for 2 days, 3h for 3 hours, 1d5h for 1 day 5 hours")
     when.add_argument("-a", "--after", type=str, default=None,
         help="Only show directories after this date, specified in the format "
              "yyyymmdd-hhmmss, partial specifications (e.g. yyyymmdd-hh) allowed")
+    when.add_argument("-A", "--all", action="store_true", default=False,
+        help="List all directories, no matter how old")
     args = parser.parse_args()
 
     resultsdir = args.dir
