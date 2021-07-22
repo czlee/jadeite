@@ -98,7 +98,7 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Number of clients, n")
         parser.add_argument("-l", "--lr-client", type=float, default=1e-2,
             help="Learning rate at client")
-        parser.add_argument("--data-per-client", type=int, default=None,
+        parser.add_argument("-dpc", "--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
                  "divide all data equally among clients)")
         parser.add_argument("--send", choices=["params", "deltas"],
