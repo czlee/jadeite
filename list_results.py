@@ -136,16 +136,6 @@ def parse_start_time(args):
     if args.all:
         return None
 
-    if args.recent is not None:
-        pattern = r'^(?:(\d(?:\.\d)?)d)?(?:(\d(?:\.\d)?)h)?$'
-        m = re.match(pattern, args.recent)
-        if not m:
-            print(f"Invalid --recent argument: {args.recent}")
-            exit(1)
-        days, hours = m.groups()
-        period = datetime.timedelta(days=float(days) if days else 0, hours=float(hours) if hours else 0)
-        return datetime.datetime.now() - period
-
     if args.after is not None:
         formats = ["%Y", "%Y%m", "%Y%m%d", "%Y%m%d-%H", "%Y%m%d-%H%M", "%Y%m%d-%H%M%S"]
         for fmt in formats:
@@ -158,6 +148,16 @@ def parse_start_time(args):
         else:
             print(f"Invalid --after argument: {args.after}")
             exit(1)
+
+    if args.recent is not None:
+        pattern = r'^(?:(\d(?:\.\d)?)d)?(?:(\d(?:\.\d)?)h)?$'
+        m = re.match(pattern, args.recent)
+        if not m:
+            print(f"Invalid --recent argument: {args.recent}")
+            exit(1)
+        days, hours = m.groups()
+        period = datetime.timedelta(days=float(days) if days else 0, hours=float(hours) if hours else 0)
+        return datetime.datetime.now() - period
 
     return None
 
