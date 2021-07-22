@@ -69,7 +69,7 @@ class BaseExperiment:
         parser.add_argument("-b", "--batch-size", type=int,
             help="Batch size")
         parser.add_argument("--cpu", action="store_true", default=False,
-            help="Force use of CPU (i.e. don't use CUDA)")
+            help="Force use of CPU, i.e. don't use CUDA even if available")
 
         # Set defaults, but only if it's in both cls.default_params and the parser's arguments
         arg_names = vars(parser.parse_args([])).keys()  # get all existing arguments

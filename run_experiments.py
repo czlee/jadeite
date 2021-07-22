@@ -33,7 +33,10 @@ import utils
 
 def run_experiments(experiment_class, description="Description not provided."):
 
-    parser = argparse.ArgumentParser(description=description, conflict_handler='resolve')
+    parser = argparse.ArgumentParser(
+        description=description,
+        conflict_handler='resolve',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     experiment_class.add_arguments(parser)
     parser.add_argument("--small", action="store_true", default=False,
         help="Use a small dataset for testing")

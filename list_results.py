@@ -1,7 +1,13 @@
 #!/usr/bin/env python
-
 """Lists results directories with a summary of their contents.
 Useful for quickly inspecting which directory contains which experiments.
+Also shows if any scripts are still running.
+
+For scripts that run many experiments, it shows the number of experiments
+finished, expected and unfinished. For example, "13/20  r1" means 13 of the
+expected 20 experiments have finished, 1 is unfinished, and the relevant process
+appears still to be running ("r") on this machine. The other status codes are
+"u" for unfinished but not running, and "?" for hasn't started.
 """
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
@@ -197,15 +203,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
-        help="Results directory")
-    parser.add_argument("-s", "--show", nargs='+', default=[],
+        help="Results directory (default: ./results)")
+    parser.add_argument("-s", "--show", nargs='+', default=[], metavar="ARG",
         help="Always show these arguments, even if equal to the default")
     when = parser.add_mutually_exclusive_group()
-    when.add_argument("-r", "--recent", type=str, default='1d',
-        help="Only show directories less than a day old, or less than a specified time, "
-             "e.g. 2d for 2 days, 3h for 3 hours, 1d5h for 1 day 5 hours")
-    when.add_argument("-a", "--after", type=str, default=None,
-        help="Only show directories after this date, specified in the format "
+    when.add_argument("-r", "--recent", type=str, default='1d', metavar="PERIOD",
+        help="Only show directories less than a day old, or less than a specified "
+             "period of time, e.g. 2d for 2 days, 3h for 3 hours, 1d5h for 1 day "
+             "5 hours. This is the default, with a period of 1 day.")
+    when.add_argument("-a", "--after", type=str, default=None, metavar="DATETIME",
+        help="Only show directories after this date and time, specified in the format "
              "yyyymmdd-hhmmss, partial specifications (e.g. yyyymmdd-hh) allowed")
     when.add_argument("-A", "--all", action="store_true", default=False,
         help="List all directories, no matter how old")
@@ -248,29 +255,30 @@ if __name__ == "__main__":
             unfinished, finished, expected = detect_composite_status(directory, arguments)
             if is_running:
                 color = "\033[0;32m"
-                script = script + f" ({finished}/{expected} r{unfinished})"
+                status = f"{finished:>3}/{expected:<3} r{unfinished}"
             elif unfinished > 0:
                 # not running, but at least one is unfinished
                 color = "\033[1;35m"
-                script = script + f" ({finished}/{expected} u{unfinished})"
+                status = f"{finished:>3}/{expected:<3} u{unfinished}"
             elif finished == expected:
                 # seems to be done and dusted
                 color = "\033[1;36m"
-                script = script + f" ({finished}/{expected})"
+                status = f"{finished:>3}/{expected:<3}   "
             else:
                 # seems to be incomplete but no single run is unfinished
                 color = "\033[1;33m"
-                script = script + f" ({finished}/{expected} u{unfinished})"
+                status = f"{finished:>3}/{expected:<3} u{unfinished}"
         elif is_running:
-            script = script + " (r)"
+            status = "        r  "
             color = "\033[0;32m"
         elif not has_started(directory):
-            script = script + " (?)"
+            status = "        ?  "
             color = "\033[0;31m"
         elif not has_finished(directory):
-            script = script + " (u)"
+            status = "        u  "
             color = "\033[0;33m"
         else:
+            status = ""
             color = ""
 
-        print(f"{color}{date} {commit} {script:<32}\033[0m  {argsstring}")
+        print(f"{color}{date} {commit} {status:10} {script:<17}\033[0m  {argsstring}")

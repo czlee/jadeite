@@ -15,7 +15,9 @@ import metrics
 import utils
 from experiments import SimpleExperiment
 
-parser = argparse.ArgumentParser(description=__doc__)
+parser = argparse.ArgumentParser(
+    description=__doc__,
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 SimpleExperiment.add_arguments(parser)
 parser.add_argument("--small", action="store_true", default=False,
     help="Use a small dataset for testing")
