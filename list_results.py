@@ -156,7 +156,7 @@ def parse_start_time(args):
             exit(1)
 
     if args.recent is not None:
-        pattern = r'^(?:(\d(?:\.\d)?)d)?(?:(\d(?:\.\d)?)h)?$'
+        pattern = r'^(?:(\d+(?:\.\d*)?)d)?(?:(\d+(?:\.\d*)?)h)?$'
         m = re.match(pattern, args.recent)
         if not m:
             print(f"Invalid --recent argument: {args.recent}")
