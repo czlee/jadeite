@@ -15,8 +15,8 @@ import torch
 from .federated import BaseFederatedExperiment
 
 
-class OverTheAirExperiment(BaseFederatedExperiment):
-    """Class for over-the-air experiment.
+class BaseOverTheAirExperiment(BaseFederatedExperiment):
+    """Base class for over-the-air experiment.
 
     This class models our main proposed analog scheme. It trains clients, and
     then has clients transmit symbols over a simulated Gaussian MAC. The server
@@ -28,7 +28,6 @@ class OverTheAirExperiment(BaseFederatedExperiment):
     default_params.update({
         'noise': 1.0,
         'power': 1.0,
-        'parameter_radius': 1.0,
     })
 
     @classmethod
@@ -40,17 +39,18 @@ class OverTheAirExperiment(BaseFederatedExperiment):
             help="Noise level (variance), σₙ²")
         parser.add_argument("-P", "--power", type=float,
             help="Power level, P")
-        parser.add_argument("-B", "--parameter-radius", type=float,
-            help="Parameter radius, B")
 
         super().add_arguments(parser)
+
+    def get_parameter_radius(self):
+        raise NotImplementedError
 
     def client_transmit(self, model) -> torch.Tensor:
         """Returns the symbols that should be transmitted from the client that
         is working with the given (client) `model`, as a row tensor.
         """
         P = self.params['power']             # noqa: N806
-        B = self.params['parameter_radius']  # noqa: N806
+        B = self.get_parameter_radius()      # noqa: N806
         values = self.get_values_to_send(model)
         symbols = values * sqrt(P) / B
         assert symbols.dim() == 2 and symbols.size()[0] == 1
@@ -73,7 +73,7 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         channel.
         """
         P = self.params['power']             # noqa: N806
-        B = self.params['parameter_radius']  # noqa: N806
+        B = self.get_parameter_radius()      # noqa: N806
 
         scaled_symbols = symbols / self.nclients * B / sqrt(P)
         self.update_global_model(scaled_symbols)
@@ -92,3 +92,47 @@ class OverTheAirExperiment(BaseFederatedExperiment):
         records.update(self.record_tx_powers(tx_symbols))
         rx_symbols = self.channel(tx_symbols)
         self.server_receive(rx_symbols)
+
+
+class OverTheAirExperiment(BaseOverTheAirExperiment):
+    """Simple over-the-air experiment that just has the user specify the
+    parameter radius ahead of time.
+
+    In our initial experiments this seemed like a terrible idea in practice,
+    because the values that need to be transmitted changes a lot depending on
+    how far through training the model is. This, in turn, would see significant
+    changes in actual power usage as training progressed, meaning in turn that
+    the actual power used fell well short of the power constraint a lot of the
+    time. A system that instead makes a simple effort to dynamically scale power
+    is in DynamicPowerOverTheAirExperiment.
+    """
+
+    default_params = BaseOverTheAirExperiment.default_params.copy()
+    default_params.update({
+        'parameter_radius': 1.0,
+    })
+
+    @classmethod
+    def add_arguments(cls, parser):
+        """Adds relevant command-line arguments to the given `parser`, which
+        should be an `argparse.ArgumentParser` object.
+        """
+        parser.add_argument("-B", "--parameter-radius", type=float,
+            help="Parameter radius, B")
+
+        super().add_arguments(parser)
+
+    def get_parameter_radius(self):
+        return self.params['parameter_radius']
+
+
+class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
+    """Like OverTheAirExperiment, but this dynamically scales the parameter
+    radius ("B") to try to maintain tx power at around the given power
+    constraint, according to the following (very simple, presumptuous) protocol:
+
+    This class therefore does not have a `parameter_radius` parameter.
+
+    This class is not yet implemented.
+    """
+    pass
