@@ -124,7 +124,65 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
         self.update_global_model(scaled_symbols)
 
 
-class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
+class RmsTxValueTrackerMixin:
+    """Mixin adding internal tracking of an exponential moving average of the
+    root-mean-square of the transmitted vectors.
+
+    The exponential moving average (EMA) coefficient is set by the
+    `ema_coefficient` parameter, which should be between 0 and 1.
+
+    Subclasses should call `self.add_to_buffer(client, values)` to update the
+    EMA. Typically, they'd do so just after calling `self.get_values_to_send()`
+    (if the subclass inherits from `BaseFederatedExperiment`).
+
+    This mixin just tracks the EMA. It's up to subclasses to figure out what to
+    do with it. Subclasses can access the current EMAs in `self.rms_ema_buffer`,
+    which is a list of floats with one entry per client, corresponding to the
+    client indices specified in the `self.add_to_buffer(client, values)` call.
+
+    Subclasses must set `self.nclients` (or inherit from a parent class that
+    does so, like `BaseFederatedExperiment`) in its `__init__()`.
+
+    This is used by `DynamicPowerOverTheAirExperiment` and
+    `experiments.digital.DynamicRangeQuantizationFederatedExperiment`.
+    """
+
+    default_params_to_add = {
+        'ema_coefficient': 1 / 3,
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # check parameter values for sensibility
+        if not (0.0 <= self.params['ema_coefficient'] <= 1.0):
+            logger.warning("EMA coefficient should be between 0 and 1, found: "
+                           f"{self.params['ema_coefficient']}")
+
+        self.rms_ema_buffer = [None] * self.nclients
+
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("-a", "--ema-coefficient", type=float, metavar="ALPHA",
+            help="Exponential moving average coefficient for dynamic power control, "
+                 "should be between 0 and 1")
+        super().add_arguments(parser)
+
+    def add_to_buffer(self, client: int, values: torch.Tensor):
+        rms_value = sqrt(values.square().mean().item())
+
+        if self.rms_ema_buffer[client] is None:  # first value
+            new_ema = rms_value
+        else:
+            α = self.params['ema_coefficient']
+            new_ema = α * rms_value + (1 - α) * self.rms_ema_buffer[client]
+
+        self.rms_ema_buffer[client] = new_ema
+        self.records[f'ema_client{client}'] = new_ema
+        self.records[f'msg_rms_client{client}'] = rms_value
+
+
+class DynamicPowerOverTheAirExperiment(RmsTxValueTrackerMixin, BaseOverTheAirExperiment):
     """Like OverTheAirExperiment, but this dynamically scales the parameter
     radius ("B") to try to maintain tx power at around the given power
     constraint, according to the following (very simple, presumptuous) protocol:
@@ -143,8 +201,8 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     outliers getting in the way.
 
     This dynamic power control is hence governed by four parameters:
-    - The exponential moving average coefficient is set by the
-      `power_ema_coefficient` parameter.
+    - The exponential moving average coefficient is set by the `ema_coefficient`
+      parameter.
     - The update frequency is set by the `power_update_period` parameter.
     - The percentile rank is set by the `power_quantile` parameter (and is
       actually between 0 and 1).
@@ -155,8 +213,8 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     """
 
     default_params = BaseOverTheAirExperiment.default_params.copy()
+    default_params.update(RmsTxValueTrackerMixin.default_params_to_add)
     default_params.update({
-        'power_ema_coefficient': 1 / 3,
         'power_update_period': 5,
         'power_quantile': 0.9,
         'power_factor': 0.9,
@@ -169,22 +227,15 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
         if not (0.0 <= self.params['power_quantile'] <= 1.0):
             logger.error("Dynamic power quantile must be between 0 and 1, found: "
                          f"{self.params['power_quantile']}")
-        if not (0.0 <= self.params['power_ema_coefficient'] <= 1.0):
-            logger.warning("EMA coefficient should be between 0 and 1, found: "
-                           f"{self.params['power_ema_coefficient']}")
         if not (0.0 <= self.params['power_factor'] <= 1.0):
             logger.warning("Dynamic power factor should normally be between 0 and 1, found: "
                            f"{self.params['power_factor']}")
 
-        self.ema_buffer = [None] * self.nclients
         self.current_parameter_radius = 1.0
 
     @classmethod
     def add_arguments(cls, parser):
         power_args = parser.add_argument_group(title="Dynamic power control parameters")
-        power_args.add_argument("-ema", "--power-ema-coefficient", type=float, metavar="COEFFICIENT",
-            help="Exponential moving average coefficient for dynamic power control, should be "
-                 "between 0 and 1")
         power_args.add_argument("-pup", "--power-update-period", type=int, metavar="PERIOD",
             help="Number of rounds between power control updates")
         power_args.add_argument("-pq", "--power-quantile", type=float, metavar="QUANTILE",
@@ -195,22 +246,9 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
             help="Divide the inferred parameter radius by this value before use, should "
                  "generally be between 0 and 1 (normally closer to 1). This is called the "
                  "power factor because it has the effect of scaling the power by this factor, "
-                 "so e.g. a factor of 0.8 would effectively scale down power by 20%")
+                 "so e.g. a factor of 0.8 would effectively scale down power by 20%%")
 
         super().add_arguments(parser)
-
-    def add_to_buffer(self, client: int, values: torch.Tensor):
-        rms_value = sqrt(values.square().mean().item())
-
-        if self.ema_buffer[client] is None:  # first value
-            new_ema = rms_value
-        else:
-            α = self.params['power_ema_coefficient']
-            new_ema = α * rms_value + (1 - α) * self.ema_buffer[client]
-
-        self.ema_buffer[client] = new_ema
-        self.records[f'ema_client{client}'] = new_ema
-        self.records[f'msg_rms_client{client}'] = rms_value
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
@@ -241,5 +279,5 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
             # (i.e. the clients "sent this information through a side channel")
             q = self.params['power_quantile']
             γ = self.params['power_factor']
-            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
+            ema_at_quantile = torch.quantile(torch.tensor(self.rms_ema_buffer), q).item()
             self.current_parameter_radius = ema_at_quantile / sqrt(γ)
