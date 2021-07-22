@@ -39,20 +39,6 @@ class BaseOverTheAirExperiment(BaseFederatedExperiment):
 
         super().add_arguments(parser)
 
-    def get_parameter_radius(self):
-        raise NotImplementedError
-
-    def client_transmit(self, model) -> torch.Tensor:
-        """Returns the symbols that should be transmitted from the client that
-        is working with the given (client) `model`, as a row tensor.
-        """
-        P = self.params['power']             # noqa: N806
-        B = self.get_parameter_radius()      # noqa: N806
-        values = self.get_values_to_send(model)
-        symbols = values * sqrt(P) / B
-        assert symbols.dim() == 2 and symbols.size()[0] == 1
-        return symbols
-
     def channel(self, client_symbols: Sequence[torch.Tensor]) -> torch.Tensor:
         """Returns the channel output when the channel inputs are as provided in
         `client_symbols`, which should be a list of tensors.
@@ -65,28 +51,23 @@ class BaseOverTheAirExperiment(BaseFederatedExperiment):
         assert output.dim() == 2 and output.size()[0] == 1
         return output
 
+    def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
+        """Returns the symbols that should be transmitted from the client with
+        index `client`, as a row tensor. The `model` of the given client is also
+        provided. Subclasses must implement this method.
+        """
+        raise NotImplementedError
+
     def server_receive(self, symbols):
         """Updates the global `model` given the `symbols` received from the
-        channel.
+        channel. Subclasses must implement this method.
         """
-        P = self.params['power']             # noqa: N806
-        B = self.get_parameter_radius()      # noqa: N806
+        raise NotImplementedError
 
-        scaled_symbols = symbols / self.nclients * B / sqrt(P)
-        self.update_global_model(scaled_symbols)
-
-    def record_tx_powers(self, tx_symbols) -> dict:
-        records = {}
-        for i, symbols in enumerate(tx_symbols):
-            tx_power = (symbols.square().sum().cpu() / symbols.numel()).numpy()
-            records[f"tx_power_client{i}"] = tx_power
-        return records
-
-    def transmit_and_aggregate(self, records: dict):
+    def transmit_and_aggregate(self):
         """Transmits model data over the channel, receives a noisy version at
         the server and updates the model at the server."""
-        tx_symbols = [self.client_transmit(model) for model in self.client_models]
-        records.update(self.record_tx_powers(tx_symbols))
+        tx_symbols = [self.client_transmit(i, model) for i, model in enumerate(self.client_models)]
         rx_symbols = self.channel(tx_symbols)
         self.server_receive(rx_symbols)
 
@@ -116,8 +97,28 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
 
         super().add_arguments(parser)
 
-    def get_parameter_radius(self):
-        return self.params['parameter_radius']
+    def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
+        P = self.params['power']             # noqa: N806
+        B = self.params['parameter_radius']  # noqa: N806
+
+        values = self.get_values_to_send(model)
+        symbols = values * sqrt(P) / B
+
+        # record some statistics
+        norm = torch.linalg.vector_norm(values).item()
+        self.records[f'msg_norm_client{client}'] = norm
+        tx_power = symbols.square().mean().item()
+        self.records[f"tx_power_client{client}"] = tx_power
+
+        assert symbols.dim() == 2 and symbols.size()[0] == 1
+        return symbols
+
+    def server_receive(self, symbols):
+        P = self.params['power']             # noqa: N806
+        B = self.params['parameter_radius']  # noqa: N806
+
+        scaled_symbols = symbols / self.nclients * B / sqrt(P)
+        self.update_global_model(scaled_symbols)
 
 
 class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
@@ -125,12 +126,12 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     radius ("B") to try to maintain tx power at around the given power
     constraint, according to the following (very simple, presumptuous) protocol:
 
-    Each client tracks a moving average of the norm of the value vectors that it
-    has transmitted. Every few (say, 5) periods, clients "send" their current
-    moving average values to the server, which itself takes some percentile rank
-    among the clients (say, the 90th percentile), multiplies it by some factor
-    (say, 0.9), and sends that value back to the clients to be used by all
-    clients as the parameter radius.
+    Each client tracks an exponential moving average of the norm of the value
+    vectors that it has transmitted. Every few (say, 5) periods, clients "send"
+    their current moving average values to the server, which itself takes some
+    percentile rank among the clients (say, the 90th percentile), multiplies it
+    by some factor (say, 0.9), and sends that value back to the clients to be
+    used by all clients as the parameter radius.
 
     The logic behind the percentile rank idea is that the power constraint is
     supposed to be satisfied by all clients individually, not just by the
@@ -139,7 +140,8 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     outliers getting in the way.
 
     This dynamic power control is hence governed by four parameters:
-    - The moving average window is set by the `power_average_period` parameter.
+    - The exponential moving average coefficient is set by the
+      `power_ema_coefficient` parameter.
     - The update frequency is set by the `power_update_period` parameter.
     - The percentile rank is set by the `power_quantile` parameter (and is
       actually between 0 and 1).
@@ -149,19 +151,25 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     have a `parameter_radius` parameter.
     """
 
-    default_params = BaseFederatedExperiment.default_params.copy()
+    default_params = BaseOverTheAirExperiment.default_params.copy()
     default_params.update({
-        'power_average_period': 5,
+        'power_ema_coefficient': 1 / 3,
         'power_update_period': 5,
         'power_quantile': 0.9,
         'power_multiplier': 0.9,
     })
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.ema_buffer = [None] * self.nclients
+        self.current_parameter_radius = 1.0
+
     @classmethod
     def add_arguments(cls, parser):
         power_args = parser.add_argument_group(title="Dynamic power control parameters")
-        power_args.add_argument("-pap", "--power-average-period", type=int, metavar="PERIOD",
-            help="Moving average period for dynamic power control, in number of rounds")
+        power_args.add_argument("-ema", "--power-ema-coefficient", type=int, metavar="COEFFICIENT",
+            help="Exponential moving average coefficient for dynamic power control, in number of rounds")
         power_args.add_argument("-pup", "--power-update-period", type=int, metavar="PERIOD",
             help="Number of rounds between power control updates")
         power_args.add_argument("-pq", "--power-quantile", type=float, metavar="QUANTILE",
@@ -170,3 +178,48 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
             help="Multiply the inferred parameter radius by this value before use")
 
         super().add_arguments(parser)
+
+    def add_to_buffer(self, client: int, values: torch.Tensor):
+        norm = torch.linalg.vector_norm(values).item()
+
+        if self.ema_buffer[client] is None:  # first value
+            new_ema = norm
+        else:
+            α = self.params['power_ema_coefficient']
+            new_ema = α * norm + (1 - α) * self.ema_buffer[client]
+
+        self.ema_buffer[client] = new_ema
+        self.records[f'ema_client{client}'] = new_ema
+        self.records[f'msg_norm_client{client}'] = norm
+
+    def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
+        values = self.get_values_to_send(model)
+        self.add_to_buffer(client, values)
+
+        P = self.params['power']             # noqa: N806
+        B = self.current_parameter_radius    # noqa: N806
+        symbols = values * sqrt(P) / B
+
+        # record some statistics
+        tx_power = symbols.square().mean().item()
+        self.records[f"tx_power_client{client}"] = tx_power
+
+        assert symbols.dim() == 2 and symbols.size()[0] == 1
+        return symbols
+
+    def server_receive(self, symbols):
+        P = self.params['power']             # noqa: N806
+        B = self.current_parameter_radius    # noqa: N806
+
+        self.records['parameter_radius'] = B  # take note of parameter radius
+
+        scaled_symbols = symbols / self.nclients * B / sqrt(P)
+        self.update_global_model(scaled_symbols)
+
+        if self.current_round % self.params['power_update_period'] == 0:
+            # update the current parameter radius by looking at all the clients
+            # (i.e. the clients "sent this information through a side channel")
+            q = self.params['power_quantile']
+            γ = self.params['power_multiplier']
+            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
+            self.current_parameter_radius = γ * ema_at_quantile

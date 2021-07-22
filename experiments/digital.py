@@ -82,7 +82,7 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         Must be implemented by subclasses."""
         raise NotImplementedError
 
-    def transmit_and_aggregate(self, records: dict):
+    def transmit_and_aggregate(self):
         """Transmits model data over the channel as bits, receives the bits
         errorlessly at the server and updates the model at the server."""
         transmissions = [self.client_transmit(model) for model in self.client_models]
@@ -237,9 +237,9 @@ class SimpleQuantizationFederatedExperiment(
         self.cursor = 0
         super().run()
 
-    def transmit_and_aggregate(self, records: dict):
+    def transmit_and_aggregate(self):
         self.bits_per_channel = self.advance_bits_per_channel()
-        super().transmit_and_aggregate(records)
+        super().transmit_and_aggregate()
 
     def advance_bits_per_channel(self):
         """Returns a list of the number of bits each model parameter (in the

@@ -228,16 +228,17 @@ class BaseFederatedExperiment(BaseExperiment):
     def test(self):
         return self._test(self.test_dataloader, self.global_model)
 
-    def transmit_and_aggregate(self, records: dict):
+    def transmit_and_aggregate(self):
         """Transmits the client models from `self.client_models` and aggregates
         them at the server. At the time this is called, the clients are assumed
         to have been trained for this round (by `self.train_clients()`).
 
-        `records` is a dict that will be logged to a CSV file (with keys as
-        column headers). Subclasses may optionally add entries to this dict.
-        If they do so, they should modify the dict in-place.
+        When this is called, `self.records` is a dict that will be logged to a
+        CSV file (with keys as column headers). Subclasses may optionally add
+        entries to this dict. If they do so, they should modify the dict
+        in-place. Also, `self.current_round` will be the current round number.
 
-        This method must be implemented by subclasses."""
+        Subclasses must implement this method."""
         raise NotImplementedError
 
     def run(self):
@@ -246,17 +247,21 @@ class BaseFederatedExperiment(BaseExperiment):
         csv_logger = self.get_csv_logger('training.csv', index_field='round')
 
         for r in range(nrounds):
-            records = self.train_clients()
-            self.transmit_and_aggregate(records)
+            self.current_round = r
+
+            self.records = self.train_clients()  # this overwrites self.records
+            self.transmit_and_aggregate()
 
             test_results = self.test()
-            records.update(test_results)
+            self.records.update(test_results)
 
             logger.info(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
-            csv_logger.log(r, records)
+            csv_logger.log(r, self.records)
             self.log_model_json(r, self.global_model)
 
+        self.current_round = None
         csv_logger.close()
+
         test_results = self.test()
         self.log_evaluation(test_results)
 
@@ -276,7 +281,7 @@ class OldFederatedAveragingExperiment(BaseFederatedExperiment):
             logger.error("Use the new FederatedAveragingExperiment to send deltas.")
             raise ValueError("OldFederatedAveragingExperiment called with sending deltas")
 
-    def transmit_and_aggregate(self, records: dict):
+    def transmit_and_aggregate(self):
         """Aggregates client models by taking the mean."""
         global_dict = self.global_model.state_dict()
         for k in global_dict.keys():
@@ -305,7 +310,7 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
     a little bit more complicated.
     """
 
-    def transmit_and_aggregate(self, records: dict):
+    def transmit_and_aggregate(self):
         """Aggregates client models."""
         client_values = [self.get_values_to_send(model) for model in self.client_models]
         client_average = torch.stack(client_values, 0).mean(0)
