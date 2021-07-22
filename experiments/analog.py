@@ -7,12 +7,15 @@ loss functions and optimizers. They take care of training, testing and logging.
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
 
+import logging
 from math import sqrt
 from typing import Sequence
 
 import torch
 
 from .federated import BaseFederatedExperiment
+
+logger = logging.getLogger(__name__)
 
 
 class BaseOverTheAirExperiment(BaseFederatedExperiment):
@@ -105,8 +108,8 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
         symbols = values * sqrt(P) / B
 
         # record some statistics
-        norm = torch.linalg.vector_norm(values).item()
-        self.records[f'msg_norm_client{client}'] = norm
+        rms_value = sqrt(values.square().mean().item())
+        self.records[f'msg_rms_client{client}'] = rms_value
         tx_power = symbols.square().mean().item()
         self.records[f"tx_power_client{client}"] = tx_power
 
@@ -126,10 +129,10 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     radius ("B") to try to maintain tx power at around the given power
     constraint, according to the following (very simple, presumptuous) protocol:
 
-    Each client tracks an exponential moving average of the norm of the value
+    Each client tracks an exponential moving average of the rms of the value
     vectors that it has transmitted. Every few (say, 5) periods, clients "send"
     their current moving average values to the server, which itself takes some
-    percentile rank among the clients (say, the 90th percentile), multiplies it
+    percentile rank among the clients (say, the 90th percentile), divides it
     by some factor (say, 0.9), and sends that value back to the clients to be
     used by all clients as the parameter radius.
 
@@ -145,7 +148,7 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     - The update frequency is set by the `power_update_period` parameter.
     - The percentile rank is set by the `power_quantile` parameter (and is
       actually between 0 and 1).
-    - The multiplier is set by the `power_multiplier` parameter.
+    - The divisor is set by the `power_factor` parameter.
 
     Since the parameter radius is dynamically controlled, this class does not
     have a `parameter_radius` parameter.
@@ -156,11 +159,22 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
         'power_ema_coefficient': 1 / 3,
         'power_update_period': 5,
         'power_quantile': 0.9,
-        'power_multiplier': 0.9,
+        'power_factor': 0.9,
     })
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # check parameter values for sensibility
+        if not (0.0 <= self.params['power_quantile'] <= 1.0):
+            logger.error("Dynamic power quantile must be between 0 and 1, found: "
+                         f"{self.params['power_quantile']}")
+        if not (0.0 <= self.params['power_ema_coefficient'] <= 1.0):
+            logger.warning("EMA coefficient should be between 0 and 1, found: "
+                           f"{self.params['power_ema_coefficient']}")
+        if not (0.0 <= self.params['power_factor'] <= 1.0):
+            logger.warning("Dynamic power factor should normally be between 0 and 1, found: "
+                           f"{self.params['power_factor']}")
 
         self.ema_buffer = [None] * self.nclients
         self.current_parameter_radius = 1.0
@@ -168,29 +182,35 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     @classmethod
     def add_arguments(cls, parser):
         power_args = parser.add_argument_group(title="Dynamic power control parameters")
-        power_args.add_argument("-ema", "--power-ema-coefficient", type=int, metavar="COEFFICIENT",
-            help="Exponential moving average coefficient for dynamic power control, in number of rounds")
+        power_args.add_argument("-ema", "--power-ema-coefficient", type=float, metavar="COEFFICIENT",
+            help="Exponential moving average coefficient for dynamic power control, should be "
+                 "between 0 and 1")
         power_args.add_argument("-pup", "--power-update-period", type=int, metavar="PERIOD",
             help="Number of rounds between power control updates")
         power_args.add_argument("-pq", "--power-quantile", type=float, metavar="QUANTILE",
-            help="Quantile among clients to take for power control")
-        power_args.add_argument("-pm", "--power-multiplier", type=float, metavar="MULTIPLIER",
-            help="Multiply the inferred parameter radius by this value before use")
+            help="Quantile among clients to take for power control, should generally be between "
+                 "0 and 1 (normally closer to 1 -- the most conservative option is to take the "
+                 "maximum among clients)")
+        power_args.add_argument("-pf", "--power-factor", type=float, metavar="FACTOR",
+            help="Divide the inferred parameter radius by this value before use, should "
+                 "generally be between 0 and 1 (normally closer to 1). This is called the "
+                 "power factor because it has the effect of scaling the power by this factor, "
+                 "so e.g. a factor of 0.8 would effectively scale down power by 20%")
 
         super().add_arguments(parser)
 
     def add_to_buffer(self, client: int, values: torch.Tensor):
-        norm = torch.linalg.vector_norm(values).item()
+        rms_value = sqrt(values.square().mean().item())
 
         if self.ema_buffer[client] is None:  # first value
-            new_ema = norm
+            new_ema = rms_value
         else:
             α = self.params['power_ema_coefficient']
-            new_ema = α * norm + (1 - α) * self.ema_buffer[client]
+            new_ema = α * rms_value + (1 - α) * self.ema_buffer[client]
 
         self.ema_buffer[client] = new_ema
         self.records[f'ema_client{client}'] = new_ema
-        self.records[f'msg_norm_client{client}'] = norm
+        self.records[f'msg_rms_client{client}'] = rms_value
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
@@ -220,6 +240,6 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
             # update the current parameter radius by looking at all the clients
             # (i.e. the clients "sent this information through a side channel")
             q = self.params['power_quantile']
-            γ = self.params['power_multiplier']
+            γ = self.params['power_factor']
             ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
-            self.current_parameter_radius = γ * ema_at_quantile
+            self.current_parameter_radius = ema_at_quantile / sqrt(γ)
