@@ -21,6 +21,7 @@ Note: This class assumes that the class given has the form of a subclass of
 
 
 import argparse
+import itertools
 import logging
 
 import coloredlogs
@@ -42,6 +43,8 @@ def run_experiments(experiment_class, description="Description not provided."):
         help="Use a small dataset for testing")
     parser.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
         help="Number of clients, n")
+    parser.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
+        help="Noise level (variance), σₙ²")
     parser.add_argument("-q", "--repeat", type=int, default=1,
         help="Number of times to repeat experiment")
     args = parser.parse_args()
@@ -57,18 +60,20 @@ def run_experiments(experiment_class, description="Description not provided."):
     metric_fns = {"accuracy": metrics.binary_accuracy}
 
     nclients_list = args.clients
+    noise_list = args.noise
 
-    for i in range(args.repeat):
-        for n in nclients_list:
-            args.clients = n
-            print(f"=== Iteration {i} of {args.repeat}, {n} clients ===")
-            results_dir = top_results_dir / f"clients-{n}-iteration-{i}"
-            results_dir.mkdir()
-            utils.log_arguments(args, results_dir, other_info={'iteration': i, 'clients': n})
-            experiment = experiment_class.from_arguments(
-                train_dataset, test_dataset, epsilon.EpsilonLogisticModel,
-                loss_fn, metric_fns, results_dir, args)
-            experiment.run()
+    for i, clients, noise in itertools.product(range(args.repeat), nclients_list, noise_list):
+        args.clients = clients
+        args.noise = noise
+        print(f"=== Iteration {i} of {args.repeat}, {clients} clients, noise {noise} ===")
+        results_dir = top_results_dir / f"clients-{clients}-noise-{noise}-iteration-{i}"
+        results_dir.mkdir()
+        utils.log_arguments(args, results_dir,
+            other_info={'iteration': i, 'clients': clients, 'noise': noise})
+        experiment = experiment_class.from_arguments(
+            train_dataset, test_dataset, epsilon.EpsilonLogisticModel,
+            loss_fn, metric_fns, results_dir, args)
+        experiment.run()
 
 
 if __name__ == "__main__":
