@@ -98,12 +98,15 @@ class SimpleStochasticQuantizationMixin:
     """Mixin for stochastic quantization functionality.
 
     This quantization uses evenly spaced bins within a symmetric quantization
-    range [-M, M]. It has no adaptive intelligence. The parameter `M` must be
-    specified as the `quantization_range` in the parameters. For values within
-    [-M, M], quantization is either up or down randomly, so that it is equal in
-    expectation to the true value. Values outside [-M, M] will just be pulled
-    back to the range boundary, i.e., -M or M. See the docstring for the
-    `quantize()` method for details.
+    range [-qrange, qrange]. The parameter `qrange` must be passed in on every
+    call, and it is for the caller to ensure that the values provided are
+    consistent.
+
+    For values within [-qrange, qrange], quantization is either up or down
+    randomly, so that it is equal in expectation to the true value. Values
+    outside [-qrange, qrange] will just be pulled back to the range boundary,
+    i.e., `-qrange` or `qrange`. See the docstring for the `quantize()` method
+    for details.
 
     There are unit tests for this mixin, see tests/test_quantize.py or invoke
     from the repository root directory:
@@ -113,14 +116,11 @@ class SimpleStochasticQuantizationMixin:
     """
 
     default_params_to_add = {
-        'quantization_range': 1.0,
         'zero_bits_strategy': 'min-one',
     }
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("-M", "--quantization-range", type=float,
-            help="Quantization range, [-M, M]")
         parser.add_argument("--zero-bits-strategy", choices=['min-one', 'read-zero'],
             help="What to do if there aren't enough bits (min-one = require at "
                  "least one bit per parameter, even if it violates the power "
@@ -129,7 +129,7 @@ class SimpleStochasticQuantizationMixin:
 
         super().add_arguments(parser)
 
-    def _binwidths(self, nbits: torch.Tensor) -> torch.Tensor:
+    def _binwidths(self, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
         """Convenience function to compute bin widths relating to `nbits`.
         Elements corresponding to `nbits == 0` are returned as NaN, unless
         `self.params['zero_bits_strategy'] == 'min_one'`, in which case they are
@@ -140,23 +140,21 @@ class SimpleStochasticQuantizationMixin:
         nbits = nbits.type(torch.float64)
         assert torch.equal(nbits, nbits.floor())
 
-        M = self.params['quantization_range']  # noqa: N806
         if self.params['zero_bits_strategy'] == 'min-one':
             nbits = torch.maximum(nbits, torch.ones_like(nbits))
         elif self.params['zero_bits_strategy'] == 'read-zero':
             nbits[nbits == 0] = float('nan')
 
         nbins = 2 ** nbits - 1
-        binwidths = 2 * M / nbins
+        binwidths = 2 * qrange / nbins
         return binwidths
 
-    def quantize(self, values: torch.Tensor, nbits: torch.Tensor) -> torch.Tensor:
+    def quantize(self, values: torch.Tensor, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
         """Quantizes the given `values` to the corresponding number of bits in
         `nbits`. The two arrays passed in must be the same size.
 
-        To quantize, the range [-M, M], where `M` is the `quantization_range`
-        parameter, is divided equally into `2 ** nbits - 1` bins. For example,
-        if M = 5:
+        To quantize, the range [-qrange, qrange], is divided equally into
+        `2 ** nbits - 1` bins. For example, if qrange = 5:
 
         nbits  value   returns indices           bin values
           1      0     0 w.p. 0.5, 1 w.p. 0.5    0 means -5,    1 means 5
@@ -170,11 +168,10 @@ class SimpleStochasticQuantizationMixin:
         be interpreted to mean 0.
         """
         assert values.shape == nbits.shape, f"shape mismatch: {nbits.shape} vs {nbits.shape}"
-        M = self.params['quantization_range']  # noqa: N806
 
-        binwidths = self._binwidths(nbits)
-        clipped = values.clip(-M, M)
-        scaled = (clipped + M) / binwidths    # scaled to 0:nbins
+        binwidths = self._binwidths(nbits, qrange)
+        clipped = values.clip(-qrange, qrange)
+        scaled = (clipped + qrange) / binwidths    # scaled to 0:nbins
         lower = torch.floor(scaled)           # rounded down
         remainder = scaled - lower            # probability we want to round up
 
@@ -186,9 +183,9 @@ class SimpleStochasticQuantizationMixin:
         indices[binwidths.isnan()] = 0      # override special case
         return indices
 
-    def unquantize(self, indices: torch.Tensor, nbits: torch.Tensor) -> torch.Tensor:
+    def unquantize(self, indices: torch.Tensor, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
         """Returns the scaled quantized values corresponding to the given
-        indices. For example, if M = 5:
+        indices. For example, if qrange = 5:
 
         nbits  index  returns value
           0      0          0
@@ -202,9 +199,8 @@ class SimpleStochasticQuantizationMixin:
         it transforms the indices back to a usable space.)
         """
         assert indices.shape == nbits.shape, f"shape mismatch: {indices.shape} vs {nbits.shape}"
-        M = self.params['quantization_range']  # noqa: N806
-        binwidths = self._binwidths(nbits)
-        values = indices * binwidths - M
+        binwidths = self._binwidths(nbits, qrange)
+        values = indices * binwidths - qrange
         values[binwidths.isnan()] = 0        # override special case
         return values
 
@@ -232,6 +228,15 @@ class SimpleQuantizationFederatedExperiment(
 
     default_params = BaseDigitalFederatedExperiment.default_params.copy()
     default_params.update(SimpleStochasticQuantizationMixin.default_params_to_add)
+    default_params.update({
+        'quantization_range': 1.0,
+    })
+
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("-Q", "--quantization-range", type=float,
+            help="Quantization range, [-Q, Q]")
+        super().add_arguments(parser)
 
     def run(self):
         self.cursor = 0
@@ -264,11 +269,13 @@ class SimpleQuantizationFederatedExperiment(
         values = self.get_values_to_send(model)
         lengths = self.bits_per_channel
         assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
-        indices = self.quantize(values, lengths)
+        qrange = self.params['quantization_range']
+        indices = self.quantize(values, lengths, qrange)
         return indices
 
     def server_receive(self, transmissions):
         lengths = self.bits_per_channel
-        unquantized = [self.unquantize(indices, lengths) for indices in transmissions]
+        qrange = self.params['quantization_range']
+        unquantized = [self.unquantize(indices, lengths, qrange) for indices in transmissions]
         client_average = torch.stack(unquantized, 0).mean(0)
         self.update_global_model(client_average)
