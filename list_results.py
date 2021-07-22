@@ -33,6 +33,12 @@ DEFAULT_ARGUMENTS = {
     'small': False,
     'cpu': False,
     'epochs': 1,
+    'power_update_period': 1,
+    'power_quantile': 0.9,
+    'power_factor': 0.9,
+    'qrange_update_period': 1,
+    'qrange_param_quantile': 0.9,
+    'qrange_client_quantile': 0.9,
 }
 
 
