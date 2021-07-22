@@ -6,4 +6,5 @@
 
 from .digital import SimpleQuantizationFederatedExperiment
 from .experiment import SimpleExperiment
-from .federated import FederatedAveragingExperiment, OverTheAirExperiment
+from .federated import FederatedAveragingExperiment
+from .analog import OverTheAirExperiment
