@@ -59,9 +59,12 @@ class BaseExperiment:
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
         """Adds relevant command-line arguments to the given `parser`.
-        Subclasses should call `super()` if they override this, and `super()`
-        should be called at the end of the implementation, because the last
-        thing it does is set the argument defaults to match
+
+        Subclasses should call `super().add_arguments()` if they override this,
+        and this should be called at the end of the implementation, because the
+        last thing it does is set the argument defaults to match
+        `cls.default_params`. Accordingly, there is no need to specify the
+        defaults in `parser.add_argument()` calls if they are set in
         `cls.default_params`.
         """
         parser.add_argument("-e", "--epochs", type=int,
@@ -207,9 +210,6 @@ class SimpleExperiment(BaseExperiment):
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
-        """Adds relevant command-line arguments to the given `parser`.
-        Subclasses should call super() if they override this.
-        """
         parser.add_argument("-l", "--lr", "--learning-rate", type=float, default=1e-2,
             help="Learning rate")
         super().add_arguments(parser)

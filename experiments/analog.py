@@ -32,9 +32,6 @@ class BaseOverTheAirExperiment(BaseFederatedExperiment):
 
     @classmethod
     def add_arguments(cls, parser):
-        """Adds relevant command-line arguments to the given `parser`, which
-        should be an `argparse.ArgumentParser` object.
-        """
         parser.add_argument("-N", "--noise", type=float,
             help="Noise level (variance), σₙ²")
         parser.add_argument("-P", "--power", type=float,
@@ -114,9 +111,6 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
 
     @classmethod
     def add_arguments(cls, parser):
-        """Adds relevant command-line arguments to the given `parser`, which
-        should be an `argparse.ArgumentParser` object.
-        """
         parser.add_argument("-B", "--parameter-radius", type=float,
             help="Parameter radius, B")
 
@@ -131,8 +125,48 @@ class DynamicPowerOverTheAirExperiment(BaseOverTheAirExperiment):
     radius ("B") to try to maintain tx power at around the given power
     constraint, according to the following (very simple, presumptuous) protocol:
 
-    This class therefore does not have a `parameter_radius` parameter.
+    Each client tracks a moving average of the norm of the value vectors that it
+    has transmitted. Every few (say, 5) periods, clients "send" their current
+    moving average values to the server, which itself takes some percentile rank
+    among the clients (say, the 90th percentile), multiplies it by some factor
+    (say, 0.9), and sends that value back to the clients to be used by all
+    clients as the parameter radius.
 
-    This class is not yet implemented.
+    The logic behind the percentile rank idea is that the power constraint is
+    supposed to be satisfied by all clients individually, not just by the
+    average among the clients. (Each client has its own battery!) We would use
+    the 90th percentile (or something like that) just to avoid the effect of
+    outliers getting in the way.
+
+    This dynamic power control is hence governed by four parameters:
+    - The moving average window is set by the `power_average_period` parameter.
+    - The update frequency is set by the `power_update_period` parameter.
+    - The percentile rank is set by the `power_quantile` parameter (and is
+      actually between 0 and 1).
+    - The multiplier is set by the `power_multiplier` parameter.
+
+    Since the parameter radius is dynamically controlled, this class does not
+    have a `parameter_radius` parameter.
     """
-    pass
+
+    default_params = BaseFederatedExperiment.default_params.copy()
+    default_params.update({
+        'power_average_period': 5,
+        'power_update_period': 5,
+        'power_quantile': 0.9,
+        'power_multiplier': 0.9,
+    })
+
+    @classmethod
+    def add_arguments(cls, parser):
+        power_args = parser.add_argument_group(title="Dynamic power control parameters")
+        power_args.add_argument("-pap", "--power-average-period", type=int, metavar="PERIOD",
+            help="Moving average period for dynamic power control, in number of rounds")
+        power_args.add_argument("-pup", "--power-update-period", type=int, metavar="PERIOD",
+            help="Number of rounds between power control updates")
+        power_args.add_argument("-pq", "--power-quantile", type=float, metavar="QUANTILE",
+            help="Quantile among clients to take for power control")
+        power_args.add_argument("-pm", "--power-multiplier", type=float, metavar="MULTIPLIER",
+            help="Multiply the inferred parameter radius by this value before use")
+
+        super().add_arguments(parser)

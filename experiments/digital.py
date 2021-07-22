@@ -62,9 +62,6 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
 
     @classmethod
     def add_arguments(cls, parser):
-        """Adds relevant command-line arguments to the given `parser`, which
-        should be an `argparse.ArgumentParser` object.
-        """
         parser.add_argument("-N", "--noise", type=float,
             help="Noise level (variance), σₙ²")
         parser.add_argument("-P", "--power", type=float,
@@ -122,9 +119,6 @@ class SimpleStochasticQuantizationMixin:
 
     @classmethod
     def add_arguments(cls, parser):
-        """Adds relevant command-line arguments to the given `parser`, which
-        should be an `argparse.ArgumentParser` object.
-        """
         parser.add_argument("-M", "--quantization-range", type=float,
             help="Quantization range, [-M, M]")
         parser.add_argument("--zero-bits-strategy", choices=['min-one', 'read-zero'],
@@ -132,6 +126,7 @@ class SimpleStochasticQuantizationMixin:
                  "least one bit per parameter, even if it violates the power "
                  "constraint; read-zero = interpret parameters without bits as "
                  "zero)")
+
         super().add_arguments(parser)
 
     def _binwidths(self, nbits: torch.Tensor) -> torch.Tensor:

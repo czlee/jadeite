@@ -91,10 +91,7 @@ class BaseFederatedExperiment(BaseExperiment):
             model.load_state_dict(global_model.state_dict())
 
     @classmethod
-    def add_arguments(cls, parser):
-        """Adds relevant command-line arguments to the given `parser`, which
-        should be an `argparse.ArgumentParser` object.
-        """
+    def add_arguments(cls, parser: argparse.ArgumentParser):
         parser.add_argument("-r", "--rounds", type=int,
             help="Number of rounds")
         parser.add_argument("-n", "--clients", type=int,
