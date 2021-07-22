@@ -8,4 +8,4 @@ exclude = venv, jupyter
 
 max-line-length = 105
 import-order-style = edited
-application-import-names = data, experiments, metrics, utils
+application-import-names = data, experiments, metrics, run_experiments, utils

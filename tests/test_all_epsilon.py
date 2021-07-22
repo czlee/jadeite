@@ -35,7 +35,8 @@ import torch
 
 import data.epsilon as epsilon
 import metrics
-from experiments import FederatedAveragingExperiment, OverTheAirExperiment, SimpleExperiment
+from experiments import (DynamicPowerOverTheAirExperiment, FederatedAveragingExperiment,
+                         OverTheAirExperiment, SimpleExperiment)
 
 
 class TestAllExperimentsWithEpsilon(unittest.TestCase):
@@ -119,3 +120,11 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
 
     def test_overtheair_params(self):
         self._test_fedavg(OverTheAirExperiment, send='params')
+
+    @unittest.skip("not yet implemented")
+    def test_dynpower_deltas(self):
+        self._test_fedavg(DynamicPowerOverTheAirExperiment, send='deltas')
+
+    @unittest.skip("not yet implemented")
+    def test_dynpower_params(self):
+        self._test_fedavg(DynamicPowerOverTheAirExperiment, send='params')
