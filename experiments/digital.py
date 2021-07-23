@@ -200,8 +200,17 @@ class QuantizationWithEqualBinsMixin:
 
     def quantize(self, values: torch.Tensor, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
         """Quantizes the given `values` to the corresponding number of bits in
-        `nbits`. The two arrays passed in must be the same size. The rounding
-        method is used is governed by the `rounding_method` parameter.
+        `nbits`. The two arrays passed in must be the same size.
+
+        To quantize, the range [-qrange, qrange], is divided equally into `2 **
+        nbits - 1` bins. Values are then rounded to a nearby quantization level.
+        The rounding is either done deterministically to the nearest level, or
+        stochastically to maintain equality in expectation, depending on how the
+        `rounding_method` parameter is set. See the docstring for
+        `quantize_deterministic()` and `quantize_stochastic()` for examples.
+
+        If nbits is 0, the corresponding index returned is always 0, and should
+        be interpreted to mean 0.
         """
         assert values.shape == nbits.shape, f"shape mismatch: {nbits.shape} vs {nbits.shape}"
 
@@ -212,11 +221,8 @@ class QuantizationWithEqualBinsMixin:
 
     def quantize_deterministic(self, values: torch.Tensor, nbits: torch.Tensor,
                                qrange: float) -> torch.Tensor:
-        """Quantizes deterministically.
-
-        To quantize, the range [-qrange, qrange], is divided equally into
-        `2 ** nbits - 1` bins. Values are then rounded to the nearest value,
-        with rounding to even as a tiebreak. For example, if qrange = 5:
+        """Quantizes deterministically by rounding to the nearest quantization
+        level. For example, if qrange = 5:
 
         nbits  value   returns indices       unquantized value
           1      0        0 (even tiebreak)      -5
@@ -225,9 +231,6 @@ class QuantizationWithEqualBinsMixin:
           2      0        2 (even tiebreak)       5/3
           2      3        2                       5/3
           3     -1        3                      -5/7
-
-        If nbits is 0, the corresponding index returned is always 0, and should
-        be interpreted to mean 0.
         """
         binwidths = self.get_binwidths(nbits, qrange)
         clipped = values.clip(-qrange, qrange)
@@ -238,13 +241,8 @@ class QuantizationWithEqualBinsMixin:
 
     def quantize_stochastic(self, values: torch.Tensor, nbits: torch.Tensor,
                             qrange: float) -> torch.Tensor:
-        """Quantizes the given `values` to the corresponding number of bits in
-        `nbits`. The two arrays passed in must be the same size.
-
-        To quantize, the range [-qrange, qrange], is divided equally into `2 **
-        nbits - 1` bins. Values are then rounded up or down to the next
-        quantization value randomly, so that it is equal in expectation to the
-        true value. For example, if qrange = 5:
+        """Quantizes stochastically to maintain equality in expectation. For
+        example, if qrange = 5:
 
         nbits  value   returns indices           bin values
           1      0     0 w.p. 0.5, 1 w.p. 0.5    0 means -5,    1 means 5
@@ -253,9 +251,6 @@ class QuantizationWithEqualBinsMixin:
           2      0     1 w.p. 0.5, 2 w.p. 0.5    1 means -5/3,  2 means 5/3
           2      3     2 w.p. 0.6, 3 w.p. 0.4    2 means  5/3,  3 means 5
           3     -1     2 w.p. 0.2, 3 w.p. 0.8    2 means -15/7, 3 means -5/7
-
-        If nbits is 0, the corresponding index returned is always 0, and should
-        be interpreted to mean 0.
         """
         binwidths = self.get_binwidths(nbits, qrange)
         clipped = values.clip(-qrange, qrange)
