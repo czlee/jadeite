@@ -35,9 +35,10 @@ class BaseOverTheAirExperiment(BaseFederatedExperiment):
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("-N", "--noise", type=float,
+        analog_args = parser.add_argument_group(title="Analog federated parameters")
+        analog_args.add_argument("-N", "--noise", type=float,
             help="Noise level (variance), σₙ²")
-        parser.add_argument("-P", "--power", type=float,
+        analog_args.add_argument("-P", "--power", type=float,
             help="Power level, P")
 
         super().add_arguments(parser)
@@ -95,7 +96,8 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("-B", "--parameter-radius", type=float,
+        ota_args = parser.add_argument_group(title="Basic over-the-air parameters")
+        ota_args.add_argument("-B", "--parameter-radius", type=float,
             help="Parameter radius, B")
 
         super().add_arguments(parser)

@@ -92,16 +92,18 @@ class BaseFederatedExperiment(BaseExperiment):
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
-        parser.add_argument("-r", "--rounds", type=int,
+
+        federated_args = parser.add_argument_group("Federated learning parameters")
+        federated_args.add_argument("-r", "--rounds", type=int,
             help="Number of rounds")
-        parser.add_argument("-n", "--clients", type=int,
+        federated_args.add_argument("-n", "--clients", type=int,
             help="Number of clients, n")
-        parser.add_argument("-l", "--lr-client", type=float, default=1e-2,
+        federated_args.add_argument("-l", "--lr-client", type=float, default=1e-2,
             help="Learning rate at client")
-        parser.add_argument("-dpc", "--data-per-client", type=int, default=None,
+        federated_args.add_argument("-dpc", "--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
                  "divide all data equally among clients)")
-        parser.add_argument("--send", choices=["params", "deltas"],
+        federated_args.add_argument("--send", choices=["params", "deltas"],
             help="What clients should send. 'params' sends the model parameters; "
                  "'deltas' sends additive updates to model parameters.")
 

@@ -68,11 +68,12 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("-N", "--noise", type=float,
+        digital_args = parser.add_argument_group(title="Digital federated parameters")
+        digital_args.add_argument("-N", "--noise", type=float,
             help="Noise level (variance), σₙ²")
-        parser.add_argument("-P", "--power", type=float,
+        digital_args.add_argument("-P", "--power", type=float,
             help="Power level, P")
-        parser.add_argument("-s", "--channel-uses", type=float,
+        digital_args.add_argument("-s", "--channel-uses", type=float,
             help="Number of channel uses (default: same as number of model components)")
 
         super().add_arguments(parser)
@@ -164,16 +165,17 @@ class QuantizationWithEqualBinsMixin:
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("-zbs", "--zero-bits-strategy", choices=['min-one', 'read-zero'],
-            help="What to do if there aren't enough bits (min-one = require at "
+        quant_args = parser.add_argument_group(title="Quantization options")
+        quant_args.add_argument("-zbs", "--zero-bits-strategy", choices=['min-one', 'read-zero'],
+            help="What to do if there aren't enough bits. min-one = require at "
                  "least one bit per parameter, even if it violates the power "
-                 "constraint; read-zero = interpret parameters without bits as "
-                 "zero)")
-        parser.add_argument("-rdm", "--rounding-method", choices=['stochastic', 'deterministic'],
-            help="Rounding method. If 'deterministic', rounds to the nearest "
-                 "quantization level, with round-to-even tiebreak. If "
-                 "'stochastic', rounds up or down randomly so that the rounded "
-                 "value is equal to the true value in expectation.")
+                 "constraint. read-zero = interpret parameters without bits as "
+                 "zero.")
+        quant_args.add_argument("-rdm", "--rounding-method", choices=['stochastic', 'deterministic'],
+            help="Rounding method. stochastic = round up or down randomly so "
+                 "that the rounded value is equal to the true value in "
+                 "expectation. deterministic = round to the nearest "
+                 "quantization level, with round-to-even tiebreak.")
 
         super().add_arguments(parser)
 
@@ -317,7 +319,8 @@ class SimpleQuantizationFederatedExperiment(
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("-Q", "--quantization-range", type=float,
+        simple_quant_args = parser.add_argument_group(title="Simple quantization parameters")
+        simple_quant_args.add_argument("-Q", "--quantization-range", type=float,
             help="Quantization range, [-Q, Q]")
         super().add_arguments(parser)
 

@@ -41,11 +41,13 @@ def run_experiments(experiment_class, description="Description not provided."):
     experiment_class.add_arguments(parser)
     parser.add_argument("--small", action="store_true", default=False,
         help="Use a small dataset for testing")
-    parser.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
+
+    matrix_args = parser.add_argument_group("Experiment matrix arguments")
+    matrix_args.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
         help="Number of clients, n")
-    parser.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
+    matrix_args.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
         help="Noise level (variance), σₙ²")
-    parser.add_argument("-q", "--repeat", type=int, default=1,
+    matrix_args.add_argument("-q", "--repeat", type=int, default=1,
         help="Number of times to repeat experiment")
     args = parser.parse_args()
 
@@ -77,4 +79,4 @@ def run_experiments(experiment_class, description="Description not provided."):
 
 
 if __name__ == "__main__":
-    print("Use one of the convenience scripts, like fedavg.py or overtheair.py.")
+    print("Use one of the convenience scripts, like dynpower.py or dynquant.py.")

@@ -1,6 +1,9 @@
-"""Shows the command noted in the arguments.json file."""
+"""Shows the command noted in the arguments.json file. This is just a very
+simple convenience script to make up for how the command is stored as a list of
+words (like, how they're understood by the command line) rather than something
+you can copy and paste into bash."""
 
-# Chuan-Zheng Le
+# Chuan-Zheng Lee
 # July 2021
 
 import argparse
