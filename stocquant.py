@@ -1,6 +1,9 @@
 """Runs long experiments with the SimpleQuantizationFederatedExperiment class,
 which implements a simple form of stochastic quantization for the digital
-scheme."""
+scheme.
+
+(It can also do deterministic quantization, see the --rounding-method option.
+The script name's a hangover from before this was implemented.)"""
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021

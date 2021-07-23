@@ -7,21 +7,24 @@ import unittest
 
 import torch
 
-from experiments.digital import SimpleStochasticQuantizationMixin
+from experiments.digital import QuantizationWithEqualBinsMixin
 
 
-class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
+class TestQuantizationMixin(unittest.TestCase):
 
     def setUp(self):
-        self.mixin = SimpleStochasticQuantizationMixin()
+        self.mixin = QuantizationWithEqualBinsMixin()
         self.mixin.params = self.mixin.default_params_to_add.copy()
 
     def set_zero_bits_strategy(self, strategy):
         self.mixin.params['zero_bits_strategy'] = strategy
 
-    def test_quantize_basic(self):
-        """Simple sanity checks."""
-        values = torch.tensor([0, 3, 8, 0, 4, -1], dtype=torch.float64)
+    def set_rounding_method(self, method):
+        self.mixin.params['rounding_method'] = method
+
+    def test_quantize_stochastic_basic(self):
+        self.set_rounding_method('stochastic')
+        values = torch.tensor([0, 3, 8, 0, 3, -1], dtype=torch.float64)
         nbits = torch.tensor([1, 1, 1, 2, 2, 3], dtype=torch.int64)
         indices = self.mixin.quantize(values, nbits, qrange=5)
         self.assertIn(indices[0], [0, 1])
@@ -31,8 +34,22 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
         self.assertIn(indices[4], [2, 3])
         self.assertIn(indices[5], [2, 3])
 
+    def test_quantize_deterministic_basic(self):
+        self.set_rounding_method('deterministic')
+
+        # do this lots of times to make sure it is actually deterministic
+        for i in range(30):
+            values = torch.tensor([0, 3, 8, 0, 3, -1], dtype=torch.float64)
+            nbits = torch.tensor([1, 1, 1, 2, 2, 3], dtype=torch.int64)
+            indices = self.mixin.quantize(values, nbits, qrange=5)
+            self.assertEqual(indices[0], 0)
+            self.assertEqual(indices[1], 1)
+            self.assertEqual(indices[2], 1)
+            self.assertEqual(indices[3], 2)
+            self.assertEqual(indices[4], 2)
+            self.assertEqual(indices[5], 3)
+
     def test_unquantize_basic(self):
-        """Simple sanity checks."""
         indices = torch.tensor([0, 1, 0, 1, 2, 3, 1, 4, 7], dtype=torch.int64)
         nbits = torch.tensor([1, 1, 2, 2, 2, 2, 3, 3, 3], dtype=torch.int64)
         values = self.mixin.unquantize(indices, nbits, qrange=5)
@@ -42,6 +59,8 @@ class TestSimpleStochasticQuantizationMixin(unittest.TestCase):
     def test_quantization_stochastically(self):
         """Quantizes and unquantizes a vector lots of times, and checks the
         averages are close to the original values."""
+        self.set_rounding_method('stochastic')
+
         qrange = 10
         n = 50
         nsamples = 10000

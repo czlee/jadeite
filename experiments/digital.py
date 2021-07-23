@@ -130,19 +130,22 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         return super().log_evaluation(evaluation_dict)
 
 
-class SimpleStochasticQuantizationMixin:
-    """Mixin for simple stochastic quantization functionality.
+class QuantizationWithEqualBinsMixin:
+    """Mixin for simple quantization functionality.
 
     This quantization uses evenly spaced bins within a symmetric quantization
     range [-qrange, qrange]. The parameter `qrange` must be passed in on every
     call, and it is for the caller to ensure that the values provided are
     consistent.
 
-    For values within [-qrange, qrange], quantization is either up or down
-    randomly, so that it is equal in expectation to the true value. Values
-    outside [-qrange, qrange] will just be pulled back to the range boundary,
-    i.e., `-qrange` or `qrange`. See the docstring for the `quantize()` method
-    for details.
+    If the `rounding_method` parameter is `"stochastic"`, then for values within
+    [-qrange, qrange], quantization is either up or down randomly, so that it is
+    equal in expectation to the true value. Values outside [-qrange, qrange]
+    will just be pulled back to the range boundary, i.e., `-qrange` or `qrange`.
+    See the docstring for the `quantize_stochastic()` method for details.
+
+    If the `rounding_method` parameter is `"deterministic"`, then values are
+    simply rounded to the nearest quantization level.
 
     There are unit tests for this mixin, see tests/test_quantize.py or invoke
     from the repository root directory:
@@ -156,26 +159,33 @@ class SimpleStochasticQuantizationMixin:
 
     default_params_to_add = {
         'zero_bits_strategy': 'min-one',
+        'rounding_method': 'stochastic',
     }
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("--zero-bits-strategy", choices=['min-one', 'read-zero'],
+        parser.add_argument("-zbs", "--zero-bits-strategy", choices=['min-one', 'read-zero'],
             help="What to do if there aren't enough bits (min-one = require at "
                  "least one bit per parameter, even if it violates the power "
                  "constraint; read-zero = interpret parameters without bits as "
                  "zero)")
+        parser.add_argument("-rdm", "--rounding-method", choices=['stochastic', 'deterministic'],
+            help="Rounding method. If 'deterministic', rounds to the nearest "
+                 "quantization level, with round-to-even tiebreak. If "
+                 "'stochastic', rounds up or down randomly so that the rounded "
+                 "value is equal to the true value in expectation.")
 
         super().add_arguments(parser)
 
-    def _binwidths(self, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
+    def get_binwidths(self, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
         """Convenience function to compute bin widths relating to `nbits`.
         Elements corresponding to `nbits == 0` are returned as NaN, unless
         `self.params['zero_bits_strategy'] == 'min_one'`, in which case they are
         treated as if `nbits` were 1.
 
         `nbits` doesn't have to be of an integer dtype, but it does need to
-        contain only integers."""
+        contain only integers.
+        """
         nbits = nbits.type(torch.float64)
         assert torch.equal(nbits, nbits.floor())
 
@@ -190,36 +200,75 @@ class SimpleStochasticQuantizationMixin:
 
     def quantize(self, values: torch.Tensor, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
         """Quantizes the given `values` to the corresponding number of bits in
-        `nbits`. The two arrays passed in must be the same size.
+        `nbits`. The two arrays passed in must be the same size. The rounding
+        method is used is governed by the `rounding_method` parameter.
+        """
+        assert values.shape == nbits.shape, f"shape mismatch: {nbits.shape} vs {nbits.shape}"
+
+        if self.params['rounding_method'] == 'stochastic':
+            return self.quantize_stochastic(values, nbits, qrange)
+        if self.params['rounding_method'] == 'deterministic':
+            return self.quantize_deterministic(values, nbits, qrange)
+
+    def quantize_deterministic(self, values: torch.Tensor, nbits: torch.Tensor,
+                               qrange: float) -> torch.Tensor:
+        """Quantizes deterministically.
 
         To quantize, the range [-qrange, qrange], is divided equally into
-        `2 ** nbits - 1` bins. For example, if qrange = 5:
+        `2 ** nbits - 1` bins. Values are then rounded to the nearest value,
+        with rounding to even as a tiebreak. For example, if qrange = 5:
+
+        nbits  value   returns indices       unquantized value
+          1      0        0 (even tiebreak)      -5
+          1      3        1                       5
+          1      8        1                       5
+          2      0        2 (even tiebreak)       5/3
+          2      3        2                       5/3
+          3     -1        3                      -5/7
+
+        If nbits is 0, the corresponding index returned is always 0, and should
+        be interpreted to mean 0.
+        """
+        binwidths = self.get_binwidths(nbits, qrange)
+        clipped = values.clip(-qrange, qrange)
+        scaled = (clipped + qrange) / binwidths  # scaled to 0:nbins
+        indices = torch.round(scaled).type(torch.int64)
+        indices[binwidths.isnan()] = 0           # override special case
+        return indices
+
+    def quantize_stochastic(self, values: torch.Tensor, nbits: torch.Tensor,
+                            qrange: float) -> torch.Tensor:
+        """Quantizes the given `values` to the corresponding number of bits in
+        `nbits`. The two arrays passed in must be the same size.
+
+        To quantize, the range [-qrange, qrange], is divided equally into `2 **
+        nbits - 1` bins. Values are then rounded up or down to the next
+        quantization value randomly, so that it is equal in expectation to the
+        true value. For example, if qrange = 5:
 
         nbits  value   returns indices           bin values
           1      0     0 w.p. 0.5, 1 w.p. 0.5    0 means -5,    1 means 5
           1      3     0 w.p. 0.2, 1 w.p. 0.8    0 means -5,    1 means 5
           1      8     1 w.p. 1                  1 means 5
           2      0     1 w.p. 0.5, 2 w.p. 0.5    1 means -5/3,  2 means 5/3
-          2      4     2 w.p. 0.3, 3 w.p. 0.7    2 means  5/3,  3 means 5
+          2      3     2 w.p. 0.6, 3 w.p. 0.4    2 means  5/3,  3 means 5
           3     -1     2 w.p. 0.2, 3 w.p. 0.8    2 means -15/7, 3 means -5/7
 
         If nbits is 0, the corresponding index returned is always 0, and should
         be interpreted to mean 0.
         """
-        assert values.shape == nbits.shape, f"shape mismatch: {nbits.shape} vs {nbits.shape}"
-
-        binwidths = self._binwidths(nbits, qrange)
+        binwidths = self.get_binwidths(nbits, qrange)
         clipped = values.clip(-qrange, qrange)
-        scaled = (clipped + qrange) / binwidths    # scaled to 0:nbins
-        lower = torch.floor(scaled)           # rounded down
-        remainder = scaled - lower            # probability we want to round up
+        scaled = (clipped + qrange) / binwidths  # scaled to 0:nbins
+        lower = torch.floor(scaled)              # rounded down
+        remainder = scaled - lower               # probability we want to round up
 
         assert torch.logical_or(torch.logical_and(remainder.ge(0), remainder.le(1)),
                                 remainder.isnan()).all(), remainder
 
         round_up = torch.rand_like(remainder) < remainder
         indices = (lower + round_up).type(torch.int64)
-        indices[binwidths.isnan()] = 0      # override special case
+        indices[binwidths.isnan()] = 0           # override special case
         return indices
 
     def unquantize(self, indices: torch.Tensor, nbits: torch.Tensor, qrange: float) -> torch.Tensor:
@@ -238,14 +287,14 @@ class SimpleStochasticQuantizationMixin:
         it transforms the indices back to a usable space.)
         """
         assert indices.shape == nbits.shape, f"shape mismatch: {indices.shape} vs {nbits.shape}"
-        binwidths = self._binwidths(nbits, qrange)
+        binwidths = self.get_binwidths(nbits, qrange)
         values = indices * binwidths - qrange
         values[binwidths.isnan()] = 0        # override special case
         return values
 
 
 class SimpleQuantizationFederatedExperiment(
-        SimpleStochasticQuantizationMixin,
+        QuantizationWithEqualBinsMixin,
         BaseDigitalFederatedExperiment):
     """Digital federated experiment that quantizes each component of the model
     to the number of bits available for that component. Bits are allocated using
@@ -266,7 +315,7 @@ class SimpleQuantizationFederatedExperiment(
     components. (This will probably change in a near-future implementation.)"""
 
     default_params = BaseDigitalFederatedExperiment.default_params.copy()
-    default_params.update(SimpleStochasticQuantizationMixin.default_params_to_add)
+    default_params.update(QuantizationWithEqualBinsMixin.default_params_to_add)
     default_params.update({
         'quantization_range': 1.0,
     })
@@ -294,7 +343,7 @@ class SimpleQuantizationFederatedExperiment(
 
 
 class DynamicRangeQuantizationFederatedExperiment(
-        SimpleStochasticQuantizationMixin,
+        QuantizationWithEqualBinsMixin,
         ExponentialMovingAverageMixin,
         BaseDigitalFederatedExperiment):
     """Digital federated experiment that quantizes each component of the model
@@ -318,7 +367,7 @@ class DynamicRangeQuantizationFederatedExperiment(
     """
 
     default_params = BaseDigitalFederatedExperiment.default_params.copy()
-    default_params.update(SimpleStochasticQuantizationMixin.default_params_to_add)
+    default_params.update(QuantizationWithEqualBinsMixin.default_params_to_add)
     default_params.update(ExponentialMovingAverageMixin.default_params_to_add)
     default_params.update({
         'qrange_update_period': 1,
