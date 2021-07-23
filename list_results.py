@@ -22,6 +22,7 @@ from pathlib import Path
 
 import psutil
 
+from config import RESULTS_DIRECTORY
 
 DEFAULT_ARGUMENTS = {
     'rounds': 20,
@@ -34,12 +35,14 @@ DEFAULT_ARGUMENTS = {
     'small': False,
     'cpu': False,
     'epochs': 1,
+    'ema_coefficient': 1 / 3,
     'power_update_period': 1,
     'power_quantile': 0.9,
     'power_factor': 0.9,
     'qrange_update_period': 1,
     'qrange_param_quantile': 0.9,
     'qrange_client_quantile': 0.9,
+    'rounding_method': 'stochastic',
 }
 
 
@@ -226,8 +229,8 @@ def detect_composite_status(directory, arguments):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
-        help="Results directory (default: ./results)")
+    parser.add_argument("dir", type=Path, nargs='?', default=RESULTS_DIRECTORY,
+        help=f"Results directory (default: {RESULTS_DIRECTORY})")
     parser.add_argument("-s", "--show", nargs='+', default=[], metavar="ARG",
         help="Always show these arguments, even if equal to the default")
     when = parser.add_mutually_exclusive_group()
