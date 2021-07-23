@@ -43,6 +43,7 @@ DEFAULT_ARGUMENTS = {
     'qrange_param_quantile': 0.9,
     'qrange_client_quantile': 0.9,
     'rounding_method': 'stochastic',
+    'save_models': True,
 }
 
 

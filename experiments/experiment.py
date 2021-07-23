@@ -27,6 +27,7 @@ class BaseExperiment:
     default_params = {
         'epochs': 20,
         'batch_size': 64,
+        'save_models': True,
     }
 
     def __init__(self,
@@ -71,8 +72,12 @@ class BaseExperiment:
             help="Number of epochs")
         parser.add_argument("-b", "--batch-size", type=int,
             help="Batch size")
-        parser.add_argument("--cpu", action="store_true", default=False,
+        parser.add_argument("--cpu", action="store_true",
             help="Force use of CPU, i.e. don't use CUDA even if available")
+        parser.add_argument("--no-model-save", action="store_false", dest='save_models',
+            help="Do not save files with model parameters after every round "
+                 "(by default, it saves model parameters in a JSON file for "
+                 "each round, which uses up a lot of disk space)")
 
         # Set defaults, but only if it's in both cls.default_params and the parser's arguments
         arg_names = vars(parser.parse_args([])).keys()  # get all existing arguments
@@ -103,6 +108,9 @@ class BaseExperiment:
         epoch or round number, but it can be anything that is compatible with
         a file name.
         """
+        if not self.params['save_models']:
+            return
+
         model_file = self.results_dir / f"model_at_{seq}.json"
         with open(model_file, 'w') as f:
             states = {k: v.tolist() for k, v in model.state_dict().items()}
