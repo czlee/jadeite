@@ -25,10 +25,8 @@ import itertools
 import logging
 
 import coloredlogs
-import torch
 
-import data.epsilon as epsilon
-import metrics
+import data
 import utils
 
 
@@ -39,8 +37,8 @@ def run_experiments(experiment_class, description="Description not provided."):
         conflict_handler='resolve',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     experiment_class.add_arguments(parser)
-    parser.add_argument("--small", action="store_true", default=False,
-        help="Use a small dataset for testing")
+    parser.add_argument("-d", "--dataset", choices=data.DATASET_CHOICES, default='epsilon',
+        help="Dataset (and associated model, loss and metric) to use")
 
     matrix_args = parser.add_argument_group("Experiment matrix arguments")
     matrix_args.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
@@ -56,10 +54,7 @@ def run_experiments(experiment_class, description="Description not provided."):
     top_results_dir = utils.create_results_directory()
     utils.log_arguments(args, top_results_dir)
 
-    train_dataset = epsilon.EpsilonDataset(train=True, small=args.small)
-    test_dataset = epsilon.EpsilonDataset(train=False, small=args.small)
-    loss_fn = torch.nn.functional.binary_cross_entropy
-    metric_fns = {"accuracy": metrics.binary_accuracy}
+    train_dataset, test_dataset, model_class, loss_fn, metric_fns = data.get_datasets_etc(args.dataset)
 
     nclients_list = args.clients
     noise_list = args.noise
@@ -73,8 +68,7 @@ def run_experiments(experiment_class, description="Description not provided."):
         utils.log_arguments(args, results_dir,
             other_info={'iteration': i, 'clients': clients, 'noise': noise})
         experiment = experiment_class.from_arguments(
-            train_dataset, test_dataset, epsilon.EpsilonLogisticModel,
-            loss_fn, metric_fns, results_dir, args)
+            train_dataset, test_dataset, model_class, loss_fn, metric_fns, results_dir, args)
         experiment.run()
 
 

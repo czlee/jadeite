@@ -172,7 +172,9 @@ class BaseFederatedExperiment(BaseExperiment):
         Subclasses normally shouldn't use this method. To retrieve the values
         the client should send, use `get_values_to_send()`.
         """
-        return torch.column_stack(tuple(state_dict.values()))
+        states = [state.flatten() for state in state_dict.values()]
+        flattened = torch.hstack(states).reshape(1, -1)
+        return flattened
 
     def unflatten_state_dict(self, tensor: torch.Tensor) -> dict:
         """Unflattens a (presumably 1-D) tensor into a state dict compatible

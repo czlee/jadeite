@@ -27,6 +27,11 @@ class TestQuantizationMixin(unittest.TestCase):
         values = torch.tensor([0, 3, 8, 0, 3, -1], dtype=torch.float64)
         nbits = torch.tensor([1, 1, 1, 2, 2, 3], dtype=torch.int64)
         indices = self.mixin.quantize(values, nbits, qrange=5)
+
+        # This sanity check just checks this once. The
+        # `test_quantization_stochastically` test below checks that the
+        # quantized values differ between calls, since the average can only
+        # approximately match the true value if that happens.
         self.assertIn(indices[0], [0, 1])
         self.assertIn(indices[1], [0, 1])
         self.assertIn(indices[2], [1])

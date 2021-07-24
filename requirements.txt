@@ -1,4 +1,5 @@
 torch
+torchvision   # used for CIFAR-10 dataset
 numpy
 coloredlogs
 psutil

@@ -34,7 +34,7 @@ from pathlib import Path
 import torch
 
 import data.epsilon as epsilon
-import metrics
+import data.metrics as metrics
 from experiments import (DynamicPowerOverTheAirExperiment, FederatedAveragingExperiment,
                          OverTheAirExperiment, SimpleExperiment)
 

@@ -149,9 +149,10 @@ class BaseExperiment:
             optimizer.step()
 
             now = time.time()
-            if now - last_update_time > 1:
-                self.show_progress(f"[{batch}/{nbatches} {(batch/nbatches):.0%}] "
-                                   f"loss: {loss.item()}...", end='\r')
+            if now - last_update_time > 0.4:
+                self.show_progress(f"training [{batch}/{nbatches} {(batch/nbatches):.0%}] "
+                                   f"loss: {loss.item():.7f}...", end='\r')
+                last_update_time = now
 
         return loss.item()
 
@@ -162,12 +163,14 @@ class BaseExperiment:
         method that calls this.
         """
         model.eval()
+        nbatches = len(dataloader)
+        last_update_time = time.time()
 
         results = dict.fromkeys(self.metric_fns.keys(), 0)
         results['test_loss'] = 0
 
         with torch.no_grad():
-            for x, y in dataloader:
+            for batch, (x, y) in enumerate(dataloader):
                 x = x.to(self.device)
                 y = y.to(self.device)
 
@@ -176,6 +179,11 @@ class BaseExperiment:
 
                 for metric_name, metric_fn in self.metric_fns.items():
                     results[metric_name] += metric_fn(pred, y).item()
+
+                now = time.time()
+                if now - last_update_time > 0.4:
+                    self.show_progress(f"testing [{batch}/{nbatches} {(batch/nbatches):.0%}] ", end='\r')
+                    last_update_time = now
 
         for metric_name in results.keys():
             results[metric_name] /= len(dataloader)
