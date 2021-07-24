@@ -241,8 +241,11 @@ class SimpleExperiment(BaseExperiment):
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
-        parser.add_argument("-l", "-lr", "--learning-rate", type=float, default=1e-2,
+        optimizer_args = parser.add_argument_group("Optimizer parameters")
+        optimizer_args.add_argument("-l", "-lr", "--learning-rate", type=float, default=1e-2,
             help="Learning rate")
+        optimizer_args.add_argument("--momentum", type=float, default=0.0,
+            help="Momentum of SGD")
         super().add_arguments(parser)
 
     @classmethod
@@ -261,7 +264,8 @@ class SimpleExperiment(BaseExperiment):
         the caller --- they're too complicated to try to "generalize".
         """
         device = cls._interpret_cpu_arg(args.cpu)
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate)
+        logger.debug(f"Optimizer arguments: lr {args.learning_rate}, momentum {args.momentum}")
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum)
         params = cls.extract_params_from_args(args)
         return cls(train_dataset, test_dataset, model, loss_fn, metric_fns,
                    optimizer, results_dir, device, **params)

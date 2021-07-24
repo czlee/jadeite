@@ -100,6 +100,8 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Number of clients, n")
         federated_args.add_argument("-lr", "--lr-client", type=float, default=1e-2,
             help="Learning rate at client")
+        federated_args.add_argument("--momentum-client", type=float, default=0.0,
+            help="Momentum of SGD at client")
         federated_args.add_argument("-dpc", "--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
                  "divide all data equally among clients)")
@@ -138,8 +140,9 @@ class BaseFederatedExperiment(BaseExperiment):
         global_model = model_fn()
         client_models = [model_fn() for i in range(nclients)]
 
+        logger.debug(f"Optimizer arguments: lr {args.lr_client}, momentum {args.momentum_client}")
         client_optimizers = [
-            torch.optim.SGD(model.parameters(), lr=args.lr_client)
+            torch.optim.SGD(model.parameters(), lr=args.lr_client, momentum=args.momentum_client)
             for model in client_models
         ]
 
