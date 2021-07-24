@@ -12,7 +12,7 @@ You need to copy `config.py.example` to `config.py` and set the variables inside
 
 A lot of the experiments we ran use the ["epsilon" dataset](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#epsilon). The simplest setup is to download the `epsilon_normalized.bz2` and `epsilon_normalized.t.bz2` files from this site, to put them in a directory named `epsilon`, and then to set `DATA_DIRECTORY` to the _parent_ of `epsilon`. For example, you could put the two files in `/home/you/jadeite/data/sources/epsilon`, then set `DATA_DIRECTORY = '/home/you/jadeite/data/sources`.
 
-The CIFAR-10 dataset is also supported, and is retrieved via `torchvision`, which will download it on first use if it isn't already in the location specified in `DATA_DIRECTORY`.
+The CIFAR-10 and FashionMNIST datasets are also supported, and are retrieved via `torchvision`, which will download them on first use if the required data isn't already in the location specified in `DATA_DIRECTORY`.
 
 Usage
 -----

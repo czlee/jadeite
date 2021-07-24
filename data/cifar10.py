@@ -33,10 +33,15 @@ def get_cifar10_dataset(train=True):
     # We want it to download automatically, torchvision prints a message if it's
     # already downloaded, which is kind of annoying, so check if it's there
     # first and pass download=False if it is.
-    download = not (Path(DATA_DIRECTORY) / "cifar-10-batches-py").exists()
+    cifar10_directory = Path(DATA_DIRECTORY) / "cifar10"
+    download = not (cifar10_directory / "cifar-10-batches-py").exists()
 
-    return torchvision.datasets.CIFAR10(root=DATA_DIRECTORY, train=train,
-                                        download=download, transform=transform)
+    return torchvision.datasets.CIFAR10(
+        root=cifar10_directory,
+        train=train,
+        download=download,
+        transform=transform,
+    )
 
 
 # copied from https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html

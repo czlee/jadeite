@@ -11,12 +11,14 @@ import torch
 
 from . import cifar10
 from . import epsilon
+from . import fashionmnist
 from . import metrics
 
 
 DATASET_CHOICES = [
     "epsilon",
     "epsilon-small",
+    "fashion-mnist",
     "cifar10",
 ]
 
@@ -44,6 +46,13 @@ def get_datasets_etc(name):
         train_dataset = cifar10.get_cifar10_dataset(train=True)
         test_dataset = cifar10.get_cifar10_dataset(train=False)
         model_class = cifar10.Cifar10CNN
+        loss_fn = torch.nn.functional.cross_entropy
+        metric_fns = {"accuracy": metrics.categorical_accuracy}
+
+    elif name == "fashion-mnist":
+        train_dataset = fashionmnist.get_fashion_mnist_dataset(train=True)
+        test_dataset = fashionmnist.get_fashion_mnist_dataset(train=False)
+        model_class = fashionmnist.FashionMnistNN
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
