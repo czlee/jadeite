@@ -159,7 +159,7 @@ class QuantizationWithEqualBinsMixin:
     """
 
     default_params_to_add = {
-        'zero_bits_strategy': 'min-one',
+        'zero_bits_strategy': 'read-zero',
         'rounding_method': 'stochastic',
     }
 
