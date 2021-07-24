@@ -46,7 +46,7 @@ def get_duration(directory):
 def show_duration_statistics(directory):
 
     subdirectories = [d for d in directory.iterdir() if d.is_dir()]
-    subdirectories.sort()
+    subdirectories.sort(key=get_start_time)
 
     for subd in subdirectories:
         duration = get_duration(subd)
