@@ -3,6 +3,7 @@ torchvision   # used for CIFAR-10 dataset
 numpy
 coloredlogs
 psutil
+pyyaml
 
 # Override Pillow version until a bug is fixed
 # see: https://github.com/pytorch/pytorch/issues/61125#issuecomment-872624273

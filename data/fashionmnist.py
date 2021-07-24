@@ -13,12 +13,7 @@ from pathlib import Path
 import torch.nn as nn
 import torchvision
 
-try:
-    from config import DATA_DIRECTORY
-except ImportError:
-    print("Copy config.py.example to config.py and set DATA_DIRECTORY to the path")
-    print("where data files should be found.")
-    exit(1)
+from config import DATA_DIRECTORY
 
 
 def get_fashion_mnist_dataset(train=True):

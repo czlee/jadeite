@@ -10,6 +10,7 @@ import argparse
 import json
 import pathlib
 
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("directories", nargs='+', type=pathlib.Path)
 args = parser.parse_args()

@@ -1,7 +1,7 @@
 .ipynb_checkpoints/
 __pycache__/
 venv/
-/config.py
+/config.yaml
 /latest
 /results
 /results-*/

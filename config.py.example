@@ -1,4 +1,0 @@
-# Copy this file to config.py and change the values to paths on your system.
-
-DATA_DIRECTORY = '/path/to/data'
-RESULTS_DIRECTORY = '/path/to/results'
