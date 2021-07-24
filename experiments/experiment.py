@@ -261,7 +261,7 @@ class SimpleExperiment(BaseExperiment):
         the caller --- they're too complicated to try to "generalize".
         """
         device = cls._interpret_cpu_arg(args.cpu)
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate)
         params = cls.extract_params_from_args(args)
         return cls(train_dataset, test_dataset, model, loss_fn, metric_fns,
                    optimizer, results_dir, device, **params)
