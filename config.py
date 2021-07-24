@@ -42,13 +42,13 @@ if _config_file_dict is None:
 try:
     _config_options = _config_file_dict["config"]
 except KeyError:
-    print("Malformed config.yaml file.")
+    print("config.yaml lacks a top-level 'config' item.")
     exit(1)
 
 _missing_names = set(_required_config_names) - set(_config_options.keys())
 
 if _missing_names:
-    print("The following required settings are missing from config.json:")
+    print("The following required config settings are missing from config.json:")
     for _name in _missing_names:
         print(" - " + _name)
     exit(1)

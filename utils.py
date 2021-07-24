@@ -59,6 +59,26 @@ def create_results_directory(results_base_dir=RESULTS_DIRECTORY, latest_symlink=
     return path
 
 
+def get_directories_from_args(directories_arg):
+    """Interprets directories from command-line arguments and returns a list of
+    directories. Intended for use by convenience scripts.
+    """
+    directories = []
+
+    for dirname in directories_arg:
+        directory = Path(RESULTS_DIRECTORY) / dirname
+        if not directory.exists():
+            directory = Path(dirname)
+
+        if not directory.is_dir():
+            print(f"{directory} is not a directory")
+            continue
+
+        directories.append(directory)
+
+    return directories
+
+
 def log_arguments(args, results_dir: Path, other_info=None):
     """Logs the arguments (presumably from the command line) to the file
     "arguments.json". This helps keep a full record of what the experiment was,

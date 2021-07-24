@@ -96,11 +96,11 @@ def is_composite_argument(key, value):
     return False
 
 
-def format_args_string(arguments):
+def format_args_string(arguments, always_show=[]):
     args_items = sorted(arguments.items(), key=lambda item: not is_composite_argument(*item))
     formatted_args = [
         format_argument(key, value) for key, value in args_items
-        if DEFAULT_ARGUMENTS.get(key) != value or key in args.show
+        if DEFAULT_ARGUMENTS.get(key) != value or key in always_show
     ]
     return " ".join(formatted_args)
 
@@ -227,6 +227,68 @@ def detect_composite_status(directory, arguments):
     return unfinished, finished, expected
 
 
+def show_status_line(directory, if_after=None, always_show=[]):
+    """Shows the status and arguments of the directory in a single line.
+
+    If `if_after` is provided, it should be a `datetime.datetime` object, and if
+    the directory indicates that its experiments started after this time, this
+    does nothing.
+
+    Arguments in `always_show` are always shown, even if they match the default.
+    """
+
+    date = directory.name
+
+    if (directory / "arguments.json").exists():
+        info_tuple = process_arguments(directory / "arguments.json")
+    elif (directory / "arguments.txt").exists():
+        info_tuple = process_legacy_arguments(directory / "arguments.txt")
+    else:
+        if if_after and datetime.datetime.strptime(date, "%Y%m%d-%H%M%S") > if_after:
+            print(f"\033[1;31m{date}         ???\033[0m")
+        return
+
+    script, started, commit, process_id, arguments = info_tuple
+
+    if if_after and started and started < if_after:
+        return
+
+    argsstring = format_args_string(arguments, always_show=always_show)
+    is_running = process_id is not None and psutil.pid_exists(process_id)
+
+    if is_composite_directory(arguments):
+        unfinished, finished, expected = detect_composite_status(directory, arguments)
+        if is_running:
+            color = "\033[0;32m"
+            status = f"{finished:>3}/{expected:<3} r{unfinished}"
+        elif unfinished > 0:
+            # not running, but at least one is unfinished
+            color = "\033[1;35m"
+            status = f"{finished:>3}/{expected:<3} u{unfinished}"
+        elif finished == expected:
+            # seems to be done and dusted
+            color = "\033[1;36m"
+            status = f"{finished:>3}/{expected:<3}   "
+        else:
+            # seems to be incomplete but no single run is unfinished
+            color = "\033[1;33m"
+            status = f"{finished:>3}/{expected:<3} u{unfinished}"
+    elif is_running:
+        status = "        r  "
+        color = "\033[0;32m"
+    elif not has_started(directory):
+        status = "        ?  "
+        color = "\033[0;31m"
+    elif not has_finished(directory):
+        status = "        u  "
+        color = "\033[0;33m"
+    else:
+        status = ""
+        color = ""
+
+    print(f"{color}{date} {commit} {status:10} {script:<17}\033[0m  {argsstring}")
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -259,54 +321,4 @@ if __name__ == "__main__":
     for directory in directories:
         if not directory.is_dir():
             continue
-
-        date = directory.name
-
-        if (directory / "arguments.json").exists():
-            info_tuple = process_arguments(directory / "arguments.json")
-        elif (directory / "arguments.txt").exists():
-            info_tuple = process_legacy_arguments(directory / "arguments.txt")
-        else:
-            if start_time and datetime.datetime.strptime(date, "%Y%m%d-%H%M%S") > start_time:
-                print(f"\033[1;31m{date}         ???\033[0m")
-            continue
-
-        script, started, commit, process_id, arguments = info_tuple
-
-        if start_time and started and started < start_time:
-            continue
-
-        argsstring = format_args_string(arguments)
-        is_running = process_id is not None and psutil.pid_exists(process_id)
-
-        if is_composite_directory(arguments):
-            unfinished, finished, expected = detect_composite_status(directory, arguments)
-            if is_running:
-                color = "\033[0;32m"
-                status = f"{finished:>3}/{expected:<3} r{unfinished}"
-            elif unfinished > 0:
-                # not running, but at least one is unfinished
-                color = "\033[1;35m"
-                status = f"{finished:>3}/{expected:<3} u{unfinished}"
-            elif finished == expected:
-                # seems to be done and dusted
-                color = "\033[1;36m"
-                status = f"{finished:>3}/{expected:<3}   "
-            else:
-                # seems to be incomplete but no single run is unfinished
-                color = "\033[1;33m"
-                status = f"{finished:>3}/{expected:<3} u{unfinished}"
-        elif is_running:
-            status = "        r  "
-            color = "\033[0;32m"
-        elif not has_started(directory):
-            status = "        ?  "
-            color = "\033[0;31m"
-        elif not has_finished(directory):
-            status = "        u  "
-            color = "\033[0;33m"
-        else:
-            status = ""
-            color = ""
-
-        print(f"{color}{date} {commit} {status:10} {script:<17}\033[0m  {argsstring}")
+        show_status_line(directory, if_after=start_time, always_show=args.show)
