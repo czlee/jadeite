@@ -241,7 +241,7 @@ class SimpleExperiment(BaseExperiment):
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
-        parser.add_argument("-l", "--lr", "--learning-rate", type=float, default=1e-2,
+        parser.add_argument("-l", "-lr", "--learning-rate", type=float, default=1e-2,
             help="Learning rate")
         super().add_arguments(parser)
 

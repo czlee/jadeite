@@ -98,7 +98,7 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Number of rounds")
         federated_args.add_argument("-n", "--clients", type=int,
             help="Number of clients, n")
-        federated_args.add_argument("-l", "--lr-client", type=float, default=1e-2,
+        federated_args.add_argument("-lr", "--lr-client", type=float, default=1e-2,
             help="Learning rate at client")
         federated_args.add_argument("-dpc", "--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
