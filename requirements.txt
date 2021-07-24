@@ -4,6 +4,11 @@ numpy
 coloredlogs
 psutil
 
+# Override Pillow version until a bug is fixed
+# see: https://github.com/pytorch/pytorch/issues/61125#issuecomment-872624273
+# and: https://github.com/python-pillow/Pillow/pull/5572
+pillow==8.2.0
+
 # these packages are only needed to run the Jupyter notebooks
 jupyterlab
 matplotlib
