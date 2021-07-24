@@ -8,6 +8,8 @@ The model and data transform are taken directly from:
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
 
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torchvision
@@ -30,7 +32,7 @@ def get_cifar10_dataset(train=True):
     # We want it to download automatically, torchvision prints a message if it's
     # already downloaded, which is kind of annoying, so check if it's there
     # first and pass download=False if it is.
-    download = not (DATA_DIRECTORY / "cifar-10-batches-py").exists()
+    download = not (Path(DATA_DIRECTORY) / "cifar-10-batches-py").exists()
 
     return torchvision.datasets.CIFAR10(root=DATA_DIRECTORY, train=train,
                                         download=download, transform=transform)
