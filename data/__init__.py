@@ -4,6 +4,9 @@ This also contains information about what models, loss functions and metric
 functions should be used in association with a dataset.
 """
 
+# Chuan-Zheng Lee <czlee@stanford.edu>
+# July 2021
+
 import torch
 
 from . import cifar10

@@ -85,6 +85,21 @@ class BaseExperiment:
         defaults = {key: cls.default_params[key] for key in common_names}
         parser.set_defaults(**defaults)
 
+    @staticmethod
+    def _interpret_cpu_arg(use_cpu):
+        """Returns 'cpu' or 'cuda' to indicate an argument to `device=` of
+        pytorch functions. If `use_cpu` is False but CUDA isn't available, this
+        logs a warning. Intended to be used by subclasses in `from_arguments()`
+        constructors.
+        """
+        if use_cpu:
+            return 'cpu'
+        elif torch.cuda.is_available():
+            return 'cuda'
+        else:
+            logger.warning("CUDA not available, using CPU instead")
+            return 'cpu'
+
     @classmethod
     def extract_params_from_args(cls, args: argparse.Namespace, ignore_missing=[]):
         """Extracts parameters from arguments in an `argparse.Namespace` object.
@@ -245,7 +260,7 @@ class SimpleExperiment(BaseExperiment):
         The datasets, model, loss and metrics are still directly specified by
         the caller --- they're too complicated to try to "generalize".
         """
-        device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
+        device = cls._interpret_cpu_arg(args.cpu)
         optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
         params = cls.extract_params_from_args(args)
         return cls(train_dataset, test_dataset, model, loss_fn, metric_fns,

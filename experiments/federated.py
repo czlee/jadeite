@@ -121,7 +121,7 @@ class BaseFederatedExperiment(BaseExperiment):
         """Instantiates a FederatedAveragingExperiment object from arguments
         provided by an `ArgumentParser.parse_args()` call.
         """
-        device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
+        device = cls._interpret_cpu_arg(args.cpu)
         nclients = args.clients
 
         data_per_client = args.data_per_client

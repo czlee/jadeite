@@ -22,6 +22,7 @@ except ImportError:
     exit(1)
 
 
+# copied from https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -38,7 +39,9 @@ def get_cifar10_dataset(train=True):
                                         download=download, transform=transform)
 
 
+# copied from https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 class Cifar10CNN(nn.Module):
+
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
