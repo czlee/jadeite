@@ -83,7 +83,13 @@ def process_arguments(argsfile):
     started = args_dict.get('started', None)
     if started is not None:
         started = datetime.datetime.strptime(started, '%Y-%m-%dT%H:%M:%S.%f')
-    commit = args_dict.get('git', {}).get('commit', '???    ')[:7]
+    git = args_dict.get('git', {})
+    commit = git.get('commit', '???    ')[:7]
+    changed_files = git.get('changed_files', [])
+    if changed_files and changed_files != ['']:
+        commit += "*"
+    else:
+        commit += " "
     process_id = args_dict.get('process_id')
     arguments = args_dict.get('args', {})
     return script, started, commit, process_id, arguments
