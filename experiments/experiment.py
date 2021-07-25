@@ -27,7 +27,7 @@ class BaseExperiment:
     default_params = {
         'epochs': 20,
         'batch_size': 64,
-        'save_models': True,
+        'save_models': False,
     }
 
     def __init__(self,
@@ -74,10 +74,9 @@ class BaseExperiment:
             help="Batch size")
         parser.add_argument("--cpu", action="store_true",
             help="Force use of CPU, i.e. don't use CUDA even if available")
-        parser.add_argument("--no-model-save", action="store_false", dest='save_models',
-            help="Do not save files with model parameters after every round "
-                 "(by default, it saves model parameters in a JSON file for "
-                 "each round, which uses up a lot of disk space)")
+        parser.add_argument("--save-models", action="store_true",
+            help="Save JSON files with model parameters after every round "
+                 "(warning: this uses up a lot of disk space)")
 
         # Set defaults, but only if it's in both cls.default_params and the parser's arguments
         arg_names = vars(parser.parse_args([])).keys()  # get all existing arguments
