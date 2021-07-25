@@ -29,6 +29,7 @@ DEFAULT_ARGUMENTS = {
     'batch_size': 64,
     'clients': 10,
     'lr_client': 0.01,
+    'momentum_client': 0.0,
     'noise': 1.0,
     'power': 1.0,
     'parameter_radius': 1.0,

@@ -40,7 +40,11 @@ def get_end_time(directory):
 
 
 def get_duration(directory):
-    return get_end_time(directory) - get_start_time(directory)
+    start_time = get_start_time(directory)
+    end_time = get_end_time(directory)
+    if start_time is None or end_time is None:
+        return None
+    return end_time - start_time
 
 
 def show_duration_statistics(directory):
