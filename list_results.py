@@ -44,6 +44,7 @@ DEFAULT_ARGUMENTS = {
     'qrange_param_quantile': 0.9,
     'qrange_client_quantile': 0.9,
     'rounding_method': 'stochastic',
+    'zero_bits_strategy': 'read-zero',
     'save_models': True,
 }
 
@@ -244,15 +245,15 @@ def show_status_line(directory, if_after=None, always_show=[]):
     Arguments in `always_show` are always shown, even if they match the default.
     """
 
-    date = directory.name
+    dirname = directory.name
 
     if (directory / "arguments.json").exists():
         info_tuple = process_arguments(directory / "arguments.json")
     elif (directory / "arguments.txt").exists():
         info_tuple = process_legacy_arguments(directory / "arguments.txt")
     else:
-        if if_after and datetime.datetime.strptime(date, "%Y%m%d-%H%M%S") > if_after:
-            print(f"\033[1;31m{date}         ???\033[0m")
+        if if_after and datetime.datetime.strptime(dirname, "%Y%m%d-%H%M%S") > if_after:
+            print(f"\033[1;31m{dirname}         ???\033[0m")
         return
 
     script, started, commit, process_id, arguments = info_tuple
@@ -293,7 +294,7 @@ def show_status_line(directory, if_after=None, always_show=[]):
         status = ""
         color = ""
 
-    print(f"{color}{date} {commit} {status:10} {script:<17}\033[0m  {argsstring}")
+    print(f"{color}{dirname:16} {commit} {status:10} {script:<17}\033[0m  {argsstring}")
 
 
 if __name__ == "__main__":
