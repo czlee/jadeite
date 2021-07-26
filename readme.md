@@ -1,14 +1,16 @@
 Computational experiments on over-the-air statistical estimation
 ================================================================
 
+_Chuan-Zheng Lee <czlee@stanford.edu>_
+
 This repository contains work relating to computational experiments for over-the-air statistical estimation.
 
 Installation
 ------------
 
-Requirements are in `requirements.txt`, so just `pip install -r requirements.txt`.
+Requirements are in `requirements.txt`, so just `pip install -r requirements.txt`. The main requirement is PyTorch.
 
-You need to copy `config.py.example` to `config.py` and set the variables inside it to point to useful directories. One of these directories should contain the datasets.
+You need to copy `config.example.yaml` to `config.yaml` and set the variables inside it to point to useful directories. The `DATA_DIRECTORY` directory should contain the datasets.
 
 A lot of the experiments we ran use the ["epsilon" dataset](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#epsilon). The simplest setup is to download the `epsilon_normalized.bz2` and `epsilon_normalized.t.bz2` files from this site, to put them in a directory named `epsilon`, and then to set `DATA_DIRECTORY` to the _parent_ of `epsilon`. For example, you could put the two files in `/home/you/jadeite/data/sources/epsilon`, then set `DATA_DIRECTORY = '/home/you/jadeite/data/sources`.
 
@@ -17,7 +19,9 @@ The CIFAR-10 and FashionMNIST datasets are also supported, and are retrieved via
 Usage
 -----
 
-The main scripts are:
+### Experiments
+
+The main scripts for running experiments are:
 
 - `simple.py`, which runs simple vanilla gradient descent, no federation involved.
 - `fedavg.py`, which runs federated averaging without communication constraints.
@@ -31,6 +35,20 @@ All of these scripts have `--help` available, so for example:
 ```bash
 python overtheair.py --help
 ```
+
+### Convenience scripts
+
+- `list_results.py`, or `./lsr` for short, prints a summary of what's in the results directory.
+
+  It lists directory names, commit hashes, parameters used, whether it's still in progress, and how many experiments in the test matrix have finished.
+  
+- `list_unfinished.py` lists experiments that appear to have terminated without finishing.
+
+  One way to clean these up quickly is: `python list_unfinished.py | xargs rm -r`. Be careful with this—it deletes (potentially lots of) files, so inspect the output of `python list_unfinished.py` first.
+
+- `show_command.py` prints the command used to invoke an experiment (specified by a directory).
+
+  This is sometimes useful for rerunning experiments.
 
 Coding principles
 -----------------
