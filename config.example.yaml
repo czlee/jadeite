@@ -1,4 +1,4 @@
-# Copy this file to config.py and change the values to paths on your system.
+# Copy this file to config.yaml and change the values to paths on your system.
 
 config:
   DATA_DIRECTORY: "/path/to/data"
