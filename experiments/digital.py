@@ -41,6 +41,7 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         'noise': 1.0,
         'power': 1.0,
         'channel_uses': None,
+        'parameter_schedule': 'aligned',
     })
 
     def __init__(self, *args, **kwargs):
@@ -75,6 +76,15 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
             help="Power level, P")
         digital_args.add_argument("-s", "--channel-uses", type=float,
             help="Number of channel uses (default: same as number of model components)")
+        digital_args.add_argument("-ps", "--parameter-schedule", choices=['aligned', 'staggered'],
+            help="Parameter scheduling system. In general, bits are split evenly among parameters, "
+                 "and there will be some left over due to integer division. This option describes "
+                 "how these leftover bits are rotated among parameters. In 'aligned', all clients "
+                 "assign the leftover bits to the same parameters. If 'staggered', client 2 "
+                 "assigns them to start just after the parameters that client 1 assigned, and so "
+                 "on. In precise terms, with k leftover bits, in round r, with all expressions "
+                 "taken modulo d (number of parameters): aligned = [r*k, ..., r*(k+1)-1], "
+                 "staggered = [(r+i)*k, ..., (r+i)*(k+1)-1].")
 
         super().add_arguments(parser)
 
@@ -82,22 +92,31 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         self._bits_cursor = 0
         super().run()
 
-    def advance_bits_per_tx_parameter(self):
+    def bits_per_tx_parameter(self, client: int):
         """Returns a list of the number of bits each model parameter (in the
         state dict) should use. This evenly divides the total number of bits
         available (being `self.bits * self.params['channel_uses']`) among the
-        number of model parameters (i.e., numbers to be sent). The leftover bits
-        are allocated on a rotating basis, tracked by `self._bits_cursor`.
+        number of model parameters (i.e., numbers to be sent).
         """
         d = self.nparams
         total_bits = int(self.bits * self.params['channel_uses'])
         lengths = torch.full((1, d), total_bits // d, dtype=torch.int64, device=self.device)
         nspare = total_bits - lengths.sum()
-        extras_pos = torch.arange(self._bits_cursor, self._bits_cursor + nspare, device=self.device) % d
+
+        # Proactively take numbers mod d often, to avoid potential integer
+        # overflow issues at high round numbers. (This is probably overly
+        # conservative, but better safe than sorry.) Laws of modulo arithmetic
+        # say that if a ≡ b and c ≡ d then ac ≡ bd, so this should be okay, as
+        # in, if we only took modulo d at the very end, it should be the same.
+        r = self.current_round % d
+        if self.params['parameter_schedule'] == 'staggered':
+            r = (r + client) % d
+        start = (r * nspare) % d
+
+        extras_pos = torch.arange(start, start + nspare, device=self.device) % d
         lengths[0, extras_pos] += 1
         assert lengths.sum() == total_bits, repr(lengths)
         assert lengths.max() - lengths.min() <= 1, repr(lengths)
-        self._bits_cursor = (self._bits_cursor + nspare) % d
         return lengths
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
@@ -121,7 +140,6 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         """Transmits model data over the channel as bits, receives the bits
         errorlessly at the server and updates the model at the server.
         """
-        self.bits_per_tx_parameter = self.advance_bits_per_tx_parameter()
         transmissions = [self.client_transmit(i, model) for i, model in enumerate(self.client_models)]
         self.server_receive(transmissions)
 
@@ -326,17 +344,22 @@ class SimpleQuantizationFederatedExperiment(
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
-        lengths = self.bits_per_tx_parameter
+        lengths = self.bits_per_tx_parameter(client)
         assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
         qrange = self.params['quantization_range']
         indices = self.quantize(values, lengths, qrange)
         return indices
 
     def server_receive(self, transmissions):
-        lengths = self.bits_per_tx_parameter
         qrange = self.params['quantization_range']
-        unquantized = [self.unquantize(indices, lengths, qrange) for indices in transmissions]
-        client_average = torch.stack(unquantized, 0).mean(0)
+
+        all_unquantized = []
+        for i, indices in enumerate(transmissions):
+            lengths = self.bits_per_tx_parameter(i)
+            unquantized = self.unquantize(indices, lengths, qrange)
+            all_unquantized.append(unquantized)
+
+        client_average = torch.stack(all_unquantized, 0).mean(0)
         self.update_global_model(client_average)
 
 
@@ -410,7 +433,7 @@ class DynamicRangeQuantizationFederatedExperiment(
         self.records['param_quantile'] = value_at_quantile
         self.update_ema_buffer(client, value_at_quantile)
 
-        lengths = self.bits_per_tx_parameter
+        lengths = self.bits_per_tx_parameter(client)
         assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
         qrange = self.current_qrange
         indices = self.quantize(values, lengths, qrange)
@@ -422,8 +445,13 @@ class DynamicRangeQuantizationFederatedExperiment(
         qrange = self.current_qrange
         self.records['quantization_range'] = qrange  # take note of quantization range
 
-        unquantized = [self.unquantize(indices, lengths, qrange) for indices in transmissions]
-        client_average = torch.stack(unquantized, 0).mean(0)
+        all_unquantized = []
+        for i, indices in enumerate(transmissions):
+            lengths = self.bits_per_tx_parameter(i)
+            unquantized = self.unquantize(indices, lengths, qrange)
+            all_unquantized.append(unquantized)
+
+        client_average = torch.stack(all_unquantized, 0).mean(0)
         self.update_global_model(client_average)
 
         if self.current_round % self.params['qrange_update_period'] == 0:

@@ -35,8 +35,12 @@ import torch
 
 import data.epsilon as epsilon
 import data.metrics as metrics
-from experiments import (DynamicPowerOverTheAirExperiment, FederatedAveragingExperiment,
-                         OverTheAirExperiment, SimpleExperiment)
+from experiments import (DynamicPowerOverTheAirExperiment,
+                         DynamicRangeQuantizationFederatedExperiment,
+                         FederatedAveragingExperiment,
+                         OverTheAirExperiment,
+                         SimpleExperiment,
+                         SimpleQuantizationFederatedExperiment)
 
 
 class TestAllExperimentsWithEpsilon(unittest.TestCase):
@@ -95,11 +99,12 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
         self.assertFileProduced(self.results_dir / "evaluation.json")
         self.assertFileProduced(self.results_dir / "output.log")
 
-    def _test_fedavg(self, experiment_class, send='deltas'):
+    def _test_fedavg(self, experiment_class, **kwargs):
         loss_fn = torch.nn.functional.binary_cross_entropy
         metric_fns = {"accuracy": metrics.binary_accuracy}
         args = self.get_args(experiment_class)
-        args.send = send
+        for key, value in kwargs.items():
+            setattr(args, key, value)
         experiment = experiment_class.from_arguments(
             self.train_dataset, self.test_dataset, epsilon.EpsilonLogisticModel,
             loss_fn, metric_fns, self.results_dir, args)
@@ -109,20 +114,34 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
         self.assertFileProduced(self.results_dir / "evaluation.json")
         self.assertFileProduced(self.results_dir / "output.log")
 
-    def test_fedavg_deltas(self):
+    def test_fedavg(self):
         self._test_fedavg(FederatedAveragingExperiment, send='deltas')
-
-    def test_fedavg_params(self):
         self._test_fedavg(FederatedAveragingExperiment, send='params')
 
-    def test_overtheair_deltas(self):
+    def test_overtheair(self):
         self._test_fedavg(OverTheAirExperiment, send='deltas')
-
-    def test_overtheair_params(self):
         self._test_fedavg(OverTheAirExperiment, send='params')
 
-    def test_dynpower_deltas(self):
+    def test_dynpower(self):
         self._test_fedavg(DynamicPowerOverTheAirExperiment, send='deltas')
-
-    def test_dynpower_params(self):
         self._test_fedavg(DynamicPowerOverTheAirExperiment, send='params')
+
+    def test_dynquant(self):
+        self._test_fedavg(DynamicRangeQuantizationFederatedExperiment,
+            send='deltas', parameter_schedule='aligned')
+        self._test_fedavg(DynamicRangeQuantizationFederatedExperiment,
+            send='deltas', parameter_schedule='staggered')
+        self._test_fedavg(DynamicRangeQuantizationFederatedExperiment,
+            send='params', parameter_schedule='aligned')
+        self._test_fedavg(DynamicRangeQuantizationFederatedExperiment,
+            send='params', parameter_schedule='staggered')
+
+    def test_stocquant(self):
+        self._test_fedavg(SimpleQuantizationFederatedExperiment,
+            send='deltas', parameter_schedule='aligned')
+        self._test_fedavg(SimpleQuantizationFederatedExperiment,
+            send='deltas', parameter_schedule='staggered')
+        self._test_fedavg(SimpleQuantizationFederatedExperiment,
+            send='params', parameter_schedule='aligned')
+        self._test_fedavg(SimpleQuantizationFederatedExperiment,
+            send='params', parameter_schedule='staggered')
