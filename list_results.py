@@ -45,7 +45,8 @@ DEFAULT_ARGUMENTS = {
     'qrange_client_quantile': 0.9,
     'rounding_method': 'stochastic',
     'zero_bits_strategy': 'read-zero',
-    'save_models': True,
+    'save_models': False,
+    'send': 'deltas',
 }
 
 
