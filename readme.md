@@ -5,6 +5,8 @@ _Chuan-Zheng Lee <czlee@stanford.edu>_
 
 This repository contains work relating to computational experiments for over-the-air statistical estimation.
 
+Work on analysing results of running this code is in the [czlee/kyanite](https://github.com/czlee/kyanite) repository.
+
 Installation
 ------------
 
