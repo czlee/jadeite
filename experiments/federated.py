@@ -131,8 +131,10 @@ class BaseFederatedExperiment(BaseExperiment):
             client_lengths = utils.divide_integer_evenly(len(train_dataset), nclients)
         else:
             if data_per_client * nclients > len(train_dataset):
-                raise ValueError(f"There isn't enough data ({len(train_dataset)}) to get "
-                                 f"{data_per_client} examples for each of {nclients} clients.")
+                message = (f"There isn't enough data ({len(train_dataset)}) to get "
+                           f"{data_per_client} examples for each of {nclients} clients.")
+                logger.error(message)
+                raise ValueError(message)
             client_lengths = [data_per_client] * nclients
             train_dataset = torch.utils.data.Subset(train_dataset, range(data_per_client * nclients))
 
