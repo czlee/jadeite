@@ -93,7 +93,7 @@ class BaseFederatedExperiment(BaseExperiment):
 
         if sqerror_reference:
             self._saving_squared_error = True
-            self._setup_sqerror_reference(*sqerror_reference)
+            self._setup_sqerror_reference(*sqerror_reference, device)
         else:
             self._saving_squared_error = False
 
@@ -262,7 +262,7 @@ class BaseFederatedExperiment(BaseExperiment):
 
         self.global_model.load_state_dict(new_state_dict)
 
-    def _setup_sqerror_reference(self, reference_model, reference_optimizer):
+    def _setup_sqerror_reference(self, reference_model, reference_optimizer, device):
         """Sets up reference model, dataset and optimizer for squared error
         saving. These objects are used to check what the "true" gradient is,
         using full gradient descent. We maintain separate objects for them, to
@@ -276,7 +276,7 @@ class BaseFederatedExperiment(BaseExperiment):
         # but this would lose flexibility in the constructor.
 
         logger.info("Saving squared error data")
-        self.reference_model = reference_model
+        self.reference_model = reference_model.to(device)
         self.reference_optimizer = reference_optimizer
 
         # merge all the client datasets
