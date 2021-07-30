@@ -47,6 +47,7 @@ DEFAULT_ARGUMENTS = {
     'zero_bits_strategy': 'read-zero',
     'save_models': False,
     'send': 'deltas',
+    'save_squared_error': False,
 }
 
 

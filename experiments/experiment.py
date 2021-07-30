@@ -116,7 +116,7 @@ class BaseExperiment:
         logger.debug("Extracted parameters: " + str(params))
         return params
 
-    def log_model_json(self, seq, model):
+    def log_model_json(self, seq, model, prefix=""):
         """Writes the model parameters of the given model to a file in the
         results directory. `seq` should be a sequence number, typically the
         epoch or round number, but it can be anything that is compatible with
@@ -125,7 +125,7 @@ class BaseExperiment:
         if not self.params['save_models']:
             return
 
-        model_file = self.results_dir / f"model_at_{seq}.json"
+        model_file = self.results_dir / f"{prefix}model_at_{seq}.json"
         with open(model_file, 'w') as f:
             states = {k: v.tolist() for k, v in model.state_dict().items()}
             json.dump(states, f, indent=2)

@@ -18,7 +18,7 @@ this is mistaken, this implementation may change to send only elements in
 import argparse
 import logging
 import pathlib
-from typing import Callable, Dict, Sequence
+from typing import Callable, Dict, Optional, Sequence, Tuple
 
 import torch
 
@@ -56,6 +56,7 @@ class BaseFederatedExperiment(BaseExperiment):
             client_optimizers: Sequence[torch.optim.Optimizer],
             results_dir: pathlib.Path,
             device='cpu',
+            sqerror_reference: Optional[Tuple[torch.nn.Module, torch.optim.Optimizer]] = None,
             **params):
         """This constructor requires all client datasets, models and optimizers
         to be pre-constructed ready to be passed into this constructor. The
@@ -90,6 +91,12 @@ class BaseFederatedExperiment(BaseExperiment):
         for model in self.client_models:
             model.load_state_dict(global_model.state_dict())
 
+        if sqerror_reference:
+            self._saving_squared_error = True
+            self._setup_sqerror_reference(*sqerror_reference)
+        else:
+            self._saving_squared_error = False
+
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
 
@@ -108,6 +115,10 @@ class BaseFederatedExperiment(BaseExperiment):
         federated_args.add_argument("--send", choices=["params", "deltas"],
             help="What clients should send. 'params' sends the model parameters; "
                  "'deltas' sends additive updates to model parameters.")
+        federated_args.add_argument("--save-squared-error", action="store_true",
+            help="Save the squared error of the 'true' values to be sent in each round. "
+                 "Use with caution: this runs full gradient descent on the dataset, "
+                 "so only use it if you're prepared to run full gradient descent.")
 
         super().add_arguments(parser)
 
@@ -148,10 +159,21 @@ class BaseFederatedExperiment(BaseExperiment):
             for model in client_models
         ]
 
+        if args.save_squared_error:
+            if args.momentum_client > 0:
+                message = "Saving squared error doesn't make any sense with SGD momentum"
+                logger.error(message)
+                raise ValueError(message)
+            sqerror_ref_model = model_fn()
+            sqerror_ref_optimizer = torch.optim.SGD(sqerror_ref_model.parameters(), lr=args.lr_client)
+            sqerror_reference = (sqerror_ref_model, sqerror_ref_optimizer)
+        else:
+            sqerror_reference = None
+
         params = cls.extract_params_from_args(args)
 
         return cls(client_datasets, test_dataset, client_models, global_model, loss_fn, metric_fns,
-                   client_optimizers, results_dir, device, **params)
+                   client_optimizers, results_dir, device, sqerror_reference, **params)
 
     def train_clients(self):
         """Trains all clients through one round of the number of epochs specified
@@ -224,6 +246,12 @@ class BaseFederatedExperiment(BaseExperiment):
 
         Subclasses can use this method to handle received values.
         """
+
+        if self._saving_squared_error:
+            reference_values = self._get_reference_values()
+            self.records['estimation_sqerror'] = (reference_values - values).square().sum().item()
+            self.log_model_json(self.current_round, self.reference_model, prefix="reference_")
+
         if self.params['send'] == 'deltas':
             global_flattened = self.flatten_state_dict(self.global_model.state_dict())
             updated_values = global_flattened + values
@@ -233,6 +261,43 @@ class BaseFederatedExperiment(BaseExperiment):
             new_state_dict = self.unflatten_state_dict(values)
 
         self.global_model.load_state_dict(new_state_dict)
+
+    def _setup_sqerror_reference(self, reference_model, reference_optimizer):
+        """Sets up reference model, dataset and optimizer for squared error
+        saving. These objects are used to check what the "true" gradient is,
+        using full gradient descent. We maintain separate objects for them, to
+        avoid interfering with the main learning process.
+
+        Used in combination with `_get_reference_value()`."""
+
+        # This is a little hacky, because it tries to do everything without
+        # direct access to the arguments passed to `BaseFederatedExperiment.from_arguments()`.
+        # Could be worth refactoring how `BaseFederatedExperiment.from_arguments()` works,
+        # but this would lose flexibility in the constructor.
+
+        logger.info("Saving squared error data")
+        self.reference_model = reference_model
+        self.reference_optimizer = reference_optimizer
+
+        # merge all the client datasets
+        self.reference_dataset = torch.utils.data.ConcatDataset(self.client_datasets)
+        self.reference_dataloader = torch.utils.data.DataLoader(self.reference_dataset,
+            batch_size=len(self.reference_dataset))
+        logger.debug(f"Reference dataset has {len(self.reference_dataset)} examples")
+
+    def _get_reference_values(self):
+        """Trains on the global model and logs the "true" value that would be
+        returned by `get_values_to_send()` if it had knowledge of all the data.
+        This is called from `update_global_model()`; subclasses shouldn't need
+        to call it.
+        """
+        self.reference_model.load_state_dict(self.global_model.state_dict())
+        nepochs = self.params['epochs']
+        for j in range(nepochs):
+            train_loss = self._train(self.reference_dataloader, self.reference_model,
+                                     self.reference_optimizer)
+            logger.info(f"Reference model, epoch {j}/{nepochs}: loss {train_loss}")
+        return self.get_values_to_send(self.reference_model)
 
     def test(self):
         return self._test(self.test_dataloader, self.global_model)
