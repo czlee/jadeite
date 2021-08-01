@@ -23,7 +23,6 @@ def get_start_time(directory):
         with open(argsfile) as f:
             args = json.load(f)
     except FileNotFoundError:
-        print(f"{directory} doesn't have an arguments.json file")
         return None
     return datetime.datetime.strptime(args['started'], isofmt)
 
@@ -34,7 +33,6 @@ def get_end_time(directory):
         with open(evalfile) as f:
             evaluation = json.load(f)
     except FileNotFoundError:
-        print(f"{directory} doesn't have an evaluation.json file")
         return None
     return datetime.datetime.strptime(evaluation['finished'], isofmt)
 
@@ -42,8 +40,10 @@ def get_end_time(directory):
 def get_duration(directory):
     start_time = get_start_time(directory)
     end_time = get_end_time(directory)
-    if start_time is None or end_time is None:
-        return None
+    if start_time is None:
+        return "no start time"
+    if end_time is None:
+        return "no end time"
     return end_time - start_time
 
 
