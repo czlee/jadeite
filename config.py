@@ -27,8 +27,8 @@ _config_file = pathlib.Path("config.yaml")
 
 if not _config_file.exists():
     print("Couldn't find config.yaml.")
-    print("Copy config.yaml.example to config.yaml change the values in it to appropriate")
-    print("values for your machine.")
+    print("Copy config.example.yaml to config.yaml and change the values in it to")
+    print("appropriate values for your machine.")
     exit(1)
 
 with open(_config_file) as f:
@@ -36,8 +36,8 @@ with open(_config_file) as f:
 
 if _config_file_dict is None:
     print("Nothing found in config.yaml.")
-    print("Copy config.yaml.example to config.yaml change the values in it to appropriate")
-    print("values for your machine.")
+    print("Copy config.example.yaml to config.yaml and change the values in it to")
+    print("appropriate values for your machine.")
     exit(1)
 
 # All options are in a top-level "config" to allow space to add other top-level
