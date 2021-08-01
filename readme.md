@@ -7,6 +7,11 @@ This repository contains work relating to computational experiments for over-the
 
 Work on analysing results of running this code is in the [czlee/kyanite](https://github.com/czlee/kyanite) repository.
 
+Papers related to this work:
+
+- C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9322345)", IEEE GLOBECOM 2020
+- C.Z. Lee, L.P. Barnes, A. Özgür, "[Lower Bounds for Over-the-Air Statistical Estimation](https://2021.ieee-isit.org/Papers/ViewPaper.asp?PaperNum=1944)", IEEE ISIT 2021
+
 Installation
 ------------
 
