@@ -41,7 +41,7 @@ class BaseDigitalFederatedExperiment(BaseFederatedExperiment):
         'noise': 1.0,
         'power': 1.0,
         'channel_uses': None,
-        'parameter_schedule': 'aligned',
+        'parameter_schedule': 'staggered',
     })
 
     def __init__(self, *args, **kwargs):
