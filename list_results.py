@@ -284,13 +284,13 @@ def show_status_line(directory, if_after=None, always_show=[]):
             color = "\033[1;33m"
             status = f"{finished:>3}/{expected:<3} u{unfinished}"
     elif is_running:
-        status = "        r  "
+        status = "        r "
         color = "\033[0;32m"
     elif not has_started(directory):
-        status = "        ?  "
+        status = "        ? "
         color = "\033[0;31m"
     elif not has_finished(directory):
-        status = "        u  "
+        status = "        u "
         color = "\033[0;33m"
     else:
         status = ""
