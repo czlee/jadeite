@@ -24,6 +24,18 @@ import psutil
 
 from config import RESULTS_DIRECTORY
 
+ARGUMENT_ABBREVIATIONS = {
+    'noise': 'σₙ²',
+    'power': 'P',
+    'parameter_radius': 'B',
+    'clients': 'n',
+    'dataset': 'data',
+    'momentum_client': 'mom',
+    'lr_client': 'lr',
+    'repeat': 'rep',
+    'rounds': 'rds',
+}
+
 DEFAULT_ARGUMENTS = {
     'rounds': 20,
     'batch_size': 64,
@@ -48,6 +60,7 @@ DEFAULT_ARGUMENTS = {
     'save_models': False,
     'send': 'deltas',
     'save_squared_error': False,
+    'parameter_schedule': 'staggered',
 }
 
 
@@ -127,21 +140,27 @@ def format_argument(key, value):
 
 def shorten_key_name(key):
     """Shortens long keys."""
+    if key in ARGUMENT_ABBREVIATIONS:
+        return ARGUMENT_ABBREVIATIONS[key]
     words = key.split("_")
     if len(words) == 1:
         return key
     return "".join(word[0] for word in words).upper()
 
 
+def format_arg_single_value(value):
+    if isinstance(value, float):
+        return f"{value:.4g}"
+    return str(value)
+
+
 def format_arg_value(value):
     """Formats an argument value for display.
     Currently, this just simplifies lists of consecutive integers."""
     if not isinstance(value, list):
-        return str(value)
-    if len(value) == 1:
-        return str(value)
-    if not all([isinstance(x, int) for x in value]):
-        return str(value)
+        return format_arg_single_value(value)
+    if len(value) == 1 or not all([isinstance(x, int) for x in value]):
+        return "[" + ", ".join([format_arg_single_value(x) for x in value]) + "]"
 
     lowest = min(value)
     highest = max(value)
@@ -237,7 +256,7 @@ def detect_composite_status(directory, arguments):
     return unfinished, finished, expected
 
 
-def show_status_line(directory, if_after=None, always_show=[]):
+def show_status_line(directory, if_after=None, always_show=[], filter_args={}):
     """Shows the status and arguments of the directory in a single line.
 
     If `if_after` is provided, it should be a `datetime.datetime` object, and if
@@ -262,6 +281,8 @@ def show_status_line(directory, if_after=None, always_show=[]):
 
     if if_after and started and started < if_after:
         return
+    if not matches_filter(filter_args, script, arguments):
+        return
 
     argsstring = format_args_string(arguments, always_show=always_show)
     is_running = process_id is not None and psutil.pid_exists(process_id)
@@ -277,7 +298,7 @@ def show_status_line(directory, if_after=None, always_show=[]):
             status = f"{finished:>3}/{expected:<3} u{unfinished}"
         elif finished == expected:
             # seems to be done and dusted
-            color = "\033[1;36m"
+            color = ""
             status = f"{finished:>3}/{expected:<3}   "
         else:
             # seems to be incomplete but no single run is unfinished
@@ -294,9 +315,39 @@ def show_status_line(directory, if_after=None, always_show=[]):
         color = "\033[0;33m"
     else:
         status = ""
-        color = ""
+        color = "\033[0;34m"
 
     print(f"{color}{dirname:16} {commit} {status:10} {script:<17}\033[0m  {argsstring}")
+
+
+def parse_filter_args(args):
+    """Parses --filter arguments from the command line."""
+    filter_args = {}
+    for arg in args:
+        if arg.endswith(".py"):
+            filter_args['__script__'] = arg
+        elif "=" in arg:
+            key, value = arg.split("=", maxsplit=1)
+            filter_args[key] = value
+    return filter_args
+
+
+def matches_filter(filter_args, script, arguments):
+    """Returns True if the `script` and `arguments` match the specification in
+    `filter_args`. If `arguments` doesn't have an argument in the filter, it's
+    considered to match vacuously, i.e. False is only returned if there is
+    a specific argument that does not match.
+    """
+    for filter_key, filter_value in filter_args.items():
+        if filter_key == '__script__':
+            if script != filter_args['__script__']:
+                return False
+            continue
+        if filter_key not in arguments:
+            continue
+        if format_arg_single_value(arguments[filter_key]) != filter_value:
+            return False
+    return True
 
 
 if __name__ == "__main__":
@@ -306,6 +357,11 @@ if __name__ == "__main__":
         help=f"Results directory (default: {RESULTS_DIRECTORY})")
     parser.add_argument("-s", "--show", nargs='+', default=[], metavar="ARG",
         help="Always show these arguments, even if equal to the default")
+    parser.add_argument("-f", "--filter", nargs='+', default=[],
+        help="Only show directories matching this filter. Valid filters: (a) "
+             "the name of a script, e.g. dynquant.py, (b) single-value argument "
+             "spec, e.g. rounds=150")
+
     when = parser.add_mutually_exclusive_group()
     when.add_argument("-r", "--recent", type=str, default='1d', metavar="PERIOD",
         help="Only show directories less than a day old, or less than a specified "
@@ -327,8 +383,12 @@ if __name__ == "__main__":
     start_time = parse_start_time(args)
     if start_time:
         print("\033[1;37mShowing directories after:", start_time.isoformat(), "\033[0m")
+    filter_args = parse_filter_args(args.filter)
+    if filter_args:
+        print("\033[1;37mShowing only directories matching:",
+              ", ".join(f"{key}={value}" for key, value in filter_args.items()), "\033[0m")
 
     for directory in directories:
         if not directory.is_dir():
             continue
-        show_status_line(directory, if_after=start_time, always_show=args.show)
+        show_status_line(directory, if_after=start_time, always_show=args.show, filter_args=filter_args)
