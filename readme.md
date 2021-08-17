@@ -12,6 +12,8 @@ Papers related to this work:
 - C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9322345)", IEEE GLOBECOM 2020
 - C.Z. Lee, L.P. Barnes, A. Özgür, "[Lower Bounds for Over-the-Air Statistical Estimation](https://2021.ieee-isit.org/Papers/ViewPaper.asp?PaperNum=1944)", IEEE ISIT 2021
 
+This repository is mostly licensed under the MIT License, except for the file data/resnet.py, which is copied from [Yerlan Idelbayev's repository](https://github.com/akamaster/pytorch_resnet_cifar10/) and licensed under the BSD 2-Clause License.
+
 Installation
 ------------
 

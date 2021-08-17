@@ -40,7 +40,7 @@ def get_cifar10_dataset(train=True):
 
 
 # copied from https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
-class Cifar10CNN(nn.Module):
+class Cifar10CNNSimple(nn.Module):
 
     def __init__(self):
         super().__init__()
