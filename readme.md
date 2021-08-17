@@ -52,7 +52,7 @@ python overtheair.py --help
 - `list_results.py`, or `./lsr` for short, prints a summary of what's in the results directory.
 
   It lists directory names, commit hashes, parameters used, whether it's still in progress, and how many experiments in the test matrix have finished.
-  
+
 - `list_unfinished.py` lists experiments that appear to have terminated without finishing.
 
   One way to clean these up quickly is: `python list_unfinished.py | xargs rm -r`. Be careful with this—it deletes (potentially lots of) files, so inspect the output of `python list_unfinished.py` first.

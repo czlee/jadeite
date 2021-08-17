@@ -440,8 +440,6 @@ class DynamicRangeQuantizationFederatedExperiment(
         return indices
 
     def server_receive(self, transmissions):
-        lengths = self.bits_per_tx_parameter
-
         qrange = self.current_qrange
         self.records['quantization_range'] = qrange  # take note of quantization range
 
