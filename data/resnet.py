@@ -156,7 +156,7 @@ class ResNet(nn.Module):
         out = F.avg_pool2d(out, out.size()[3])
         out = out.view(out.size(0), -1)
         out = self.linear(out)
-        return nn.functional.log_softmax(out, dim=1)  # modified by czlee
+        return out
 
 
 def resnet20():
