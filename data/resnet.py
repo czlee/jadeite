@@ -6,6 +6,13 @@ https://github.com/akamaster/pytorch_resnet_cifar10/blob/d5489e8995e81e91ce6b1d6
 
 Credit to Yerlan Idelbayev.
 
+The default option in the `BasicBlock` class has been changed to 'B', so this
+file does not produce the same networks as in the original paper at
+https://arxiv.org/abs/1512.03385, but instead a common improved version thereof.
+
+Also, some minor modifications have been made for coding style / PEP 8
+compliance.
+
 This file is licensed under the BSD 2-Clause License (rather than the MIT
 License):
 --------------------------------------------------------------------------------
@@ -32,8 +39,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --------------------------------------------------------------------------------
-
-Some minor modifications have been made for coding style / PEP 8 compliance.
 
 ================================================================================
 
@@ -90,7 +95,7 @@ class LambdaLayer(nn.Module):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, option='A'):
+    def __init__(self, in_planes, planes, stride=1, option='B'):
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
