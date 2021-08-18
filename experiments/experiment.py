@@ -243,8 +243,10 @@ class SimpleExperiment(BaseExperiment):
         optimizer_args = parser.add_argument_group("Optimizer parameters")
         optimizer_args.add_argument("-l", "-lr", "--learning-rate", type=float, default=1e-2,
             help="Learning rate")
-        optimizer_args.add_argument("--momentum", type=float, default=0.0,
+        optimizer_args.add_argument("-mom", "--momentum", type=float, default=0.0,
             help="Momentum of SGD")
+        optimizer_args.add_argument("-wd", "--weight-decay", type=float, default=0.0,
+            help="Weight decay of SGD")
         super().add_arguments(parser)
 
     @classmethod
@@ -263,8 +265,14 @@ class SimpleExperiment(BaseExperiment):
         the caller --- they're too complicated to try to "generalize".
         """
         device = cls._interpret_cpu_arg(args.cpu)
-        logger.debug(f"Optimizer arguments: lr {args.learning_rate}, momentum {args.momentum}")
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum)
+        logger.debug(f"Optimizer arguments: lr {args.learning_rate}, momentum {args.momentum}, "
+                     f"weight decay {args.weight_decay}")
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=args.learning_rate,
+            momentum=args.momentum,
+            weight_decay=args.weight_decay,
+        )
         params = cls.extract_params_from_args(args)
         return cls(train_dataset, test_dataset, model, loss_fn, metric_fns,
                    optimizer, results_dir, device, **params)

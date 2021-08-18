@@ -105,10 +105,6 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Number of rounds")
         federated_args.add_argument("-n", "--clients", type=int,
             help="Number of clients, n")
-        federated_args.add_argument("-lr", "--lr-client", type=float, default=1e-2,
-            help="Learning rate at client")
-        federated_args.add_argument("--momentum-client", type=float, default=0.0,
-            help="Momentum of SGD at client")
         federated_args.add_argument("-dpc", "--data-per-client", type=int, default=None,
             help="Override the number of data points each client has (default: "
                  "divide all data equally among clients)")
@@ -119,6 +115,14 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Save the squared error of the 'true' values to be sent in each round. "
                  "Use with caution: this runs full gradient descent on the dataset, "
                  "so only use it if you're prepared to run full gradient descent.")
+
+        optimizer_args = parser.add_argument_group("Client optimizer parameters")
+        optimizer_args.add_argument("-lr", "--lr-client", type=float, default=1e-2,
+            help="Learning rate at client")
+        optimizer_args.add_argument("-mom", "--momentum-client", type=float, default=0.0,
+            help="Momentum of SGD at client")
+        optimizer_args.add_argument("-wd", "--weight-decay-client", type=float, default=0.0,
+            help="Weight decay of SGD at client")
 
         super().add_arguments(parser)
 
@@ -153,10 +157,15 @@ class BaseFederatedExperiment(BaseExperiment):
         global_model = model_fn()
         client_models = [model_fn() for i in range(nclients)]
 
-        logger.debug(f"Optimizer arguments: lr {args.lr_client}, momentum {args.momentum_client}")
+        logger.debug(f"Optimizer arguments: lr {args.lr_client}, momentum {args.momentum_client},"
+                     f"weight decay {args.weight_decay_client}")
         client_optimizers = [
-            torch.optim.SGD(model.parameters(), lr=args.lr_client, momentum=args.momentum_client)
-            for model in client_models
+            torch.optim.SGD(
+                model.parameters(),
+                lr=args.lr_client,
+                momentum=args.momentum_client,
+                weight_decay=args.weight_decay_client,
+            ) for model in client_models
         ]
 
         if args.save_squared_error:
