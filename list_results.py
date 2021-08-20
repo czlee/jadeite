@@ -63,6 +63,8 @@ DEFAULT_ARGUMENTS = {
     'send': 'deltas',
     'save_squared_error': False,
     'parameter_schedule': 'staggered',
+    'weight_decay': 0.0,
+    'momentum': 0.0,
 }
 
 
