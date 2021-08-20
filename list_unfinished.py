@@ -29,41 +29,41 @@ def print_if_unfinished(path):
 
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("dir", type=Path, nargs='?', default=Path("results"),
+parser.add_argument("dir", type=Path, nargs='*', default=[Path("results")],
     help="Results directory")
 args = parser.parse_args()
 
-resultsdir = args.dir
+for resultsdir in args.dir:
 
-if not resultsdir.is_dir():
-    print(f"{resultsdir} is not a directory")
-    exit(1)
+    if not resultsdir.is_dir():
+        print(f"{resultsdir} is not a directory")
+        exit(1)
 
-directories = sorted(resultsdir.iterdir())
+    directories = sorted(resultsdir.iterdir())
 
-for directory in directories:
-    if not directory.is_dir():
-        continue
+    for directory in directories:
+        if not directory.is_dir():
+            continue
 
-    if (directory / "arguments.json").exists():
-        info_tuple = process_arguments(directory / "arguments.json")
-    elif (directory / "arguments.txt").exists():
-        info_tuple = process_legacy_arguments(directory / "arguments.txt")
-    else:
-        continue
+        if (directory / "arguments.json").exists():
+            info_tuple = process_arguments(directory / "arguments.json")
+        elif (directory / "arguments.txt").exists():
+            info_tuple = process_legacy_arguments(directory / "arguments.txt")
+        else:
+            continue
 
-    _, _, _, process_id, arguments = info_tuple
+        _, _, _, process_id, arguments = info_tuple
 
-    if process_id is not None and psutil.pid_exists(process_id):
-        continue
+        if process_id is not None and psutil.pid_exists(process_id):
+            continue
 
-    if is_composite_directory(arguments):
-        for child in sorted(directory.iterdir()):
-            print_if_unfinished(child)
+        if is_composite_directory(arguments):
+            for child in sorted(directory.iterdir()):
+                print_if_unfinished(child)
 
-        unfinished, finished, expected = detect_composite_status(directory, arguments)
-        if unfinished == 0 and finished == 0:
-            print(directory)
+            unfinished, finished, expected = detect_composite_status(directory, arguments)
+            if unfinished == 0 and finished == 0:
+                print(directory)
 
-    else:
-        print_if_unfinished(directory)
+        else:
+            print_if_unfinished(directory)
