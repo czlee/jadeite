@@ -235,16 +235,18 @@ def detect_composite_status(directory, arguments):
     """
 
     labels = []
-    matrix = (range(arguments['repeat']),)
+    matrix = []
     expected = arguments['repeat']
     childname_parts = []
     for label in all_matrix_labels:
         values = arguments.get(label)
         if isinstance(values, list):
             labels.append(label)
-            matrix += (values,)
+            matrix.append(values)
             expected *= len(values)
             childname_parts.append(label + "-{" + label + "}")
+    labels.append('iteration')
+    matrix.append(range(arguments['repeat']))
 
     finished = 0
     unfinished = 0
