@@ -32,6 +32,7 @@ ARGUMENT_ABBREVIATIONS = {
     'clients': 'n',
     'dataset': 'data',
     'momentum_client': 'mom',
+    'momentum': 'mom',
     'lr_client': 'lr',
     'repeat': 'rep',
     'rounds': 'rds',
