@@ -30,7 +30,19 @@ import data
 import utils
 
 
+# This defines the labels that are used in the experiment matrix, except for
+# 'iteration'/'--repeat', which is handled specially (because it is not an
+# experiment parameter and common to all experiment types). The main function
+# will filter this down for just those arguments relevant to the
+# `experiment_class`. If you add another label to this matrix, the other thing
+# you must do is add a `matrix_args.add_argument(...)` line below, conditioned
+# on the label being in `matrix_labels`.
+all_matrix_labels = ['clients', 'noise']
+
+
 def run_experiments(experiment_class, description="Description not provided."):
+
+    matrix_labels = [label for label in all_matrix_labels if label in experiment_class.default_params]
 
     parser = argparse.ArgumentParser(
         description=description,
@@ -41,12 +53,17 @@ def run_experiments(experiment_class, description="Description not provided."):
         help="Dataset (and associated model, loss and metric) to use")
 
     matrix_args = parser.add_argument_group("Experiment matrix arguments")
-    matrix_args.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
-        help="Number of clients, n")
-    matrix_args.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
-        help="Noise level (variance), σₙ²")
     matrix_args.add_argument("-q", "--repeat", type=int, default=1,
         help="Number of times to repeat experiment")
+
+    if 'clients' in matrix_labels:
+        matrix_args.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
+            help="Number of clients, n")
+
+    if 'noise' in matrix_labels:
+        matrix_args.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
+            help="Noise level (variance), σₙ²")
+
     args = parser.parse_args()
 
     coloredlogs.install(level=logging.DEBUG,
@@ -56,17 +73,27 @@ def run_experiments(experiment_class, description="Description not provided."):
 
     train_dataset, test_dataset, model_class, loss_fn, metric_fns = data.get_datasets_etc(args.dataset)
 
-    nclients_list = args.clients
-    noise_list = args.noise
+    matrix = [getattr(args, label).copy() for label in matrix_labels]
 
-    for i, clients, noise in itertools.product(range(args.repeat), nclients_list, noise_list):
-        args.clients = clients
-        args.noise = noise
-        print(f"=== Iteration {i} of {args.repeat}, {clients} clients, noise {noise} ===")
-        results_dir = top_results_dir / f"clients-{clients}-noise-{noise}-iteration-{i}"
+    for i, *matrix_values in itertools.product(range(args.repeat), *matrix):
+
+        matrix_dict = {}
+        title_strs = []
+        dirname_strs = []
+
+        for label, value in zip(matrix_labels, matrix_values):
+            setattr(args, label, value)
+            matrix_dict[label] = value
+            title_strs.append(f"{label} {value}")
+            dirname_strs.append(f"{label}-{value}")
+
+        matrix_dict['iteration'] = i
+
+        logging.info("=== " + ", ".join(f"{lab} {val}" for lab, val in matrix_dict.items()) + " ===")
+        results_dir = top_results_dir / "-".join(f"{lab}-{val}" for lab, val in matrix_dict.items())
         results_dir.mkdir()
-        utils.log_arguments(args, results_dir,
-            other_info={'iteration': i, 'clients': clients, 'noise': noise})
+        utils.log_arguments(args, results_dir, other_info=matrix_dict)
+
         experiment = experiment_class.from_arguments(
             train_dataset, test_dataset, model_class, loss_fn, metric_fns, results_dir, args)
         experiment.run()

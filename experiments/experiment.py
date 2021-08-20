@@ -253,7 +253,7 @@ class SimpleExperiment(BaseExperiment):
     def from_arguments(cls,
             train_dataset: torch.utils.data.Dataset,
             test_dataset: torch.utils.data.Dataset,
-            model: torch.nn.Module,
+            model_fn: Callable[[], torch.nn.Module],
             loss_fn: Callable,
             metric_fns: Dict[str, Callable],
             results_dir: pathlib.Path,
@@ -264,6 +264,7 @@ class SimpleExperiment(BaseExperiment):
         The datasets, model, loss and metrics are still directly specified by
         the caller --- they're too complicated to try to "generalize".
         """
+        model = model_fn()
         device = cls._interpret_cpu_arg(args.cpu)
         logger.debug(f"Optimizer arguments: lr {args.learning_rate}, momentum {args.momentum}, "
                      f"weight decay {args.weight_decay}")
