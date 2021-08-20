@@ -23,6 +23,7 @@ from pathlib import Path
 import psutil
 
 from config import RESULTS_DIRECTORY
+from run_experiments import all_matrix_labels
 
 ARGUMENT_ABBREVIATIONS = {
     'noise': 'σₙ²',
@@ -219,7 +220,7 @@ def parse_start_time(args):
 def is_composite_directory(arguments):
     if not arguments:
         return False
-    if isinstance(arguments.get('clients', None), list):
+    if 'repeat' in arguments:
         return True
     return False
 
@@ -232,22 +233,24 @@ def detect_composite_status(directory, arguments):
     It is assumed that the directory is composite, i.e. that
     `is_composite_directory(directory)` is true.
     """
-    clients = arguments['clients']
-    noise = arguments.get('noise')
-    repeat = arguments['repeat']
+
+    labels = []
+    matrix = (range(arguments['repeat']),)
+    expected = arguments['repeat']
+    childname_parts = []
+    for label in all_matrix_labels:
+        values = arguments.get(label)
+        if isinstance(values, list):
+            labels.append(label)
+            matrix += (values,)
+            expected *= len(values)
+            childname_parts.append(label + "-{" + label + "}")
+
     finished = 0
     unfinished = 0
 
-    matrix = (range(repeat), clients)
-    expected = repeat * len(clients)
-    childname_template = "clients-{1}-iteration-{0}"
-    if isinstance(noise, list):
-        matrix += (noise,)
-        expected *= len(noise)
-        childname_template = "clients-{1}-noise-{2}-iteration-{0}"
-
     for values in itertools.product(*matrix):
-        childname = childname_template.format(*values)
+        childname = "-".join(f"{label}-{value}" for label, value in zip(labels, values))
         if has_finished(directory / childname):
             finished += 1
         elif (directory / childname).exists():
