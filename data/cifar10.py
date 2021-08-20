@@ -13,18 +13,33 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torchvision
+import torchvision.transforms as transforms
 
 from config import DATA_DIRECTORY
 
 
-# copied from https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
+cifar10_transforms = {
+    # copied from https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
+    'norm1': transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+    ]),
+
+    # copied from https://github.com/akamaster/pytorch_resnet_cifar10/blob/master/trainer.py
+    'flip-crop-norm2': torchvision.transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    ]),
+    'norm2': torchvision.transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    ]),
+}
 
 
-def get_cifar10_dataset(train=True):
+def get_cifar10_dataset(train=True, transform='norm1'):
     # We want it to download automatically, torchvision prints a message if it's
     # already downloaded, which is kind of annoying, so check if it's there
     # first and pass download=False if it is.
@@ -35,7 +50,7 @@ def get_cifar10_dataset(train=True):
         root=cifar10_directory,
         train=train,
         download=download,
-        transform=transform,
+        transform=cifar10_transforms[transform],
     )
 
 

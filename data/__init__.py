@@ -23,6 +23,8 @@ DATASET_CHOICES = [
     "cifar10-simple",
     "cifar10-resnet20",
     "cifar10-resnet18",
+    "cifar10-resnet20-flipcrop",
+    "cifar10-resnet18-flipcrop",
     "fashionmnist-simple",
     "fashionmnist-convnet",
 ]
@@ -48,8 +50,8 @@ def get_datasets_etc(name):
         metric_fns = {"accuracy": metrics.binary_accuracy}
 
     elif name == "cifar10-simple":
-        train_dataset = cifar10.get_cifar10_dataset(train=True)
-        test_dataset = cifar10.get_cifar10_dataset(train=False)
+        train_dataset = cifar10.get_cifar10_dataset(train=True, transform='norm1')
+        test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm1')
         model_class = cifar10.Cifar10CNNSimple
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
@@ -62,15 +64,29 @@ def get_datasets_etc(name):
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
     elif name == "cifar10-resnet20":
-        train_dataset = cifar10.get_cifar10_dataset(train=True)
-        test_dataset = cifar10.get_cifar10_dataset(train=False)
+        train_dataset = cifar10.get_cifar10_dataset(train=True, transform='norm1')
+        test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm1')
         model_class = resnet.resnet20
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
     elif name == "cifar10-resnet18":
-        train_dataset = cifar10.get_cifar10_dataset(train=True)
-        test_dataset = cifar10.get_cifar10_dataset(train=False)
+        train_dataset = cifar10.get_cifar10_dataset(train=True, transform='norm1')
+        test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm1')
+        model_class = torchvision.models.resnet18
+        loss_fn = torch.nn.functional.cross_entropy
+        metric_fns = {"accuracy": metrics.categorical_accuracy}
+
+    elif name == "cifar10-resnet20-flipcrop":
+        train_dataset = cifar10.get_cifar10_dataset(train=True, transform='flip-crop-norm2')
+        test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm2')
+        model_class = resnet.resnet20
+        loss_fn = torch.nn.functional.cross_entropy
+        metric_fns = {"accuracy": metrics.categorical_accuracy}
+
+    elif name == "cifar10-resnet18-flipcrop":
+        train_dataset = cifar10.get_cifar10_dataset(train=True, transform='flip-crop-norm2')
+        test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm2')
         model_class = torchvision.models.resnet18
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
