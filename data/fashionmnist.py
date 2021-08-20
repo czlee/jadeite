@@ -71,4 +71,4 @@ class FashionMnistCNN(nn.Module):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.dropout(x, training=self.training)
         x = self.fc2(x)
-        return nn.functional.log_softmax(x, dim=1)
+        return x
