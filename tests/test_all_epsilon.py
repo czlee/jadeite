@@ -87,12 +87,12 @@ class TestAllExperimentsWithEpsilon(unittest.TestCase):
                 json.load(f)
 
     def test_simple(self):
-        model = epsilon.EpsilonLogisticModel()
+        model_fn = epsilon.EpsilonLogisticModel
         loss_fn = torch.nn.functional.binary_cross_entropy
         metric_fns = {"accuracy": metrics.binary_accuracy}
         args = self.get_args(SimpleExperiment)
         experiment = SimpleExperiment.from_arguments(
-            self.train_dataset, self.test_dataset, model, loss_fn, metric_fns, self.results_dir, args)
+            self.train_dataset, self.test_dataset, model_fn, loss_fn, metric_fns, self.results_dir, args)
         experiment.run()
 
         self.assertFileProduced(self.results_dir / "training.csv")
