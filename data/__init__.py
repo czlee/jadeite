@@ -26,7 +26,8 @@ DATASET_CHOICES = [
     "cifar10-resnet20-flipcrop",
     "cifar10-resnet18-flipcrop",
     "fashionmnist-simple",
-    "fashionmnist-convnet",
+    "fashionmnist-cnn1",
+    "fashionmnist-cnn2",
 ]
 
 
@@ -49,17 +50,31 @@ def get_datasets_etc(name):
         loss_fn = torch.nn.functional.binary_cross_entropy
         metric_fns = {"accuracy": metrics.binary_accuracy}
 
-    elif name == "cifar10-simple":
+    elif name == "cifar10-simple":  # previous name: "cifar10"
         train_dataset = cifar10.get_cifar10_dataset(train=True, transform='norm1')
         test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm1')
         model_class = cifar10.Cifar10CNNSimple
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
-    elif name == "fashionmnist-simple":
+    elif name == "fashionmnist-simple":  # previous name: "fashionmnist"
         train_dataset = fashionmnist.get_fashion_mnist_dataset(train=True)
         test_dataset = fashionmnist.get_fashion_mnist_dataset(train=False)
         model_class = fashionmnist.FashionMnistNNSimple
+        loss_fn = torch.nn.functional.cross_entropy
+        metric_fns = {"accuracy": metrics.categorical_accuracy}
+
+    elif name == "fashionmnist-cnn1":  # previous name: "fashionmnist-convnet"
+        train_dataset = fashionmnist.get_fashion_mnist_dataset(train=True)
+        test_dataset = fashionmnist.get_fashion_mnist_dataset(train=False)
+        model_class = fashionmnist.FashionMnistCNN1
+        loss_fn = torch.nn.functional.cross_entropy
+        metric_fns = {"accuracy": metrics.categorical_accuracy}
+
+    elif name == "fashionmnist-cnn2":
+        train_dataset = fashionmnist.get_fashion_mnist_dataset(train=True)
+        test_dataset = fashionmnist.get_fashion_mnist_dataset(train=False)
+        model_class = fashionmnist.FashionMnistCNN2
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
@@ -88,13 +103,6 @@ def get_datasets_etc(name):
         train_dataset = cifar10.get_cifar10_dataset(train=True, transform='flip-crop-norm2')
         test_dataset = cifar10.get_cifar10_dataset(train=False, transform='norm2')
         model_class = torchvision.models.resnet18
-        loss_fn = torch.nn.functional.cross_entropy
-        metric_fns = {"accuracy": metrics.categorical_accuracy}
-
-    elif name == "fashionmnist-convnet":
-        train_dataset = fashionmnist.get_fashion_mnist_dataset(train=True)
-        test_dataset = fashionmnist.get_fashion_mnist_dataset(train=False)
-        model_class = fashionmnist.FashionMnistCNN
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
