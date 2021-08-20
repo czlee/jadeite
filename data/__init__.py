@@ -8,6 +8,7 @@ functions should be used in association with a dataset.
 # July 2021
 
 import torch
+import torchvision
 
 from . import cifar10
 from . import epsilon
@@ -21,6 +22,7 @@ DATASET_CHOICES = [
     "epsilon-small",
     "cifar10-simple",
     "cifar10-resnet20",
+    "cifar10-resnet18",
     "fashionmnist-simple",
     "fashionmnist-convnet",
 ]
@@ -63,6 +65,13 @@ def get_datasets_etc(name):
         train_dataset = cifar10.get_cifar10_dataset(train=True)
         test_dataset = cifar10.get_cifar10_dataset(train=False)
         model_class = resnet.resnet20
+        loss_fn = torch.nn.functional.cross_entropy
+        metric_fns = {"accuracy": metrics.categorical_accuracy}
+
+    elif name == "cifar10-resnet18":
+        train_dataset = cifar10.get_cifar10_dataset(train=True)
+        test_dataset = cifar10.get_cifar10_dataset(train=False)
+        model_class = torchvision.models.resnet18
         loss_fn = torch.nn.functional.cross_entropy
         metric_fns = {"accuracy": metrics.categorical_accuracy}
 
