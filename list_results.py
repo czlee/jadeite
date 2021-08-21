@@ -36,6 +36,7 @@ ARGUMENT_ABBREVIATIONS = {
     'lr_client': 'lr',
     'repeat': 'rep',
     'rounds': 'rds',
+    'optimizer': 'opt',
 }
 
 DEFAULT_ARGUMENTS = {
@@ -65,6 +66,7 @@ DEFAULT_ARGUMENTS = {
     'parameter_schedule': 'staggered',
     'weight_decay': 0.0,
     'momentum': 0.0,
+    'optimizer': 'sgd',
 }
 
 
