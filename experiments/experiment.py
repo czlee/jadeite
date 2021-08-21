@@ -255,9 +255,10 @@ class SimpleExperiment(BaseExperiment):
             help="Momentum of SGD")
         optimizer_args.add_argument("-wd", "--weight-decay", type=float, default=0.0,
             help="Weight decay of SGD")
-        optimizer_args.add_argument("-lrsch", "--lr-scheduler", type=str, default=None,
-            help="Learning rate scheduler. Currently, only the multistep LR is supported, "
-                 "specify like this: multistep-<milestones>[-<gamma>], e.g. multistep-100,150-0.1")
+        optimizer_args.add_argument("-lrsch", "--lr-scheduler", type=str, default='none',
+            help="Learning rate scheduler. Currently, other than 'none', only the multistep LR is "
+                 "supported, specify like this: multistep-<milestones>[-<gamma>], e.g. "
+                 "'multistep-100,150-0.1'.")
         super().add_arguments(parser)
 
     @classmethod

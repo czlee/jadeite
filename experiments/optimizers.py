@@ -42,7 +42,7 @@ def make_optimizer(parameters, algorithm, lr, momentum, weight_decay):
 def make_scheduler(spec, optimizer):
     """Parses a string specifying an LR scheduler."""
 
-    if not spec:  # either empty string or None (or any False value)
+    if not spec or spec == 'none':  # either empty string or None (or any False value)
         logger.debug("No LR scheduler")
         return None
 
@@ -50,13 +50,9 @@ def make_scheduler(spec, optimizer):
 
     if scheduler_type == "multistep":
 
-        if "-" in parameters:
-            parameters, gamma = parameters.split("-")
-            gamma = float(gamma)
-        else:
-            gamma = 0.1  # default
-
-        milestones = [int(m) for m in parameters.split(",")]
+        milestones, gamma = parameters.split("-")
+        gamma = float(gamma)
+        milestones = [int(m) for m in milestones.split(",")]
 
         logger.debug(f"LR scheduler: multi-step with milestones {milestones}, gamma {gamma}")
 

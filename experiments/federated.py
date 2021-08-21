@@ -135,11 +135,11 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Momentum of SGD at client (not used for Adam)")
         optimizer_args.add_argument("-wd", "--weight-decay-client", type=float, default=0.0,
             help="Weight decay of optimizer at client")
-        optimizer_args.add_argument("-lrsch", "--lr-scheduler-client", type=str, default=None,
-            help="Learning rate scheduler. Currently, only the multistep LR is supported, "
-                 "specify like this: multistep-<milestones>[-<gamma>], e.g. multistep-100,150-0.1. "
-                 "Note: In federated experiments, the schedulers step once every round, not once "
-                 "every local epoch.")
+        optimizer_args.add_argument("-lrsch", "--lr-scheduler-client", type=str, default='none',
+            help="Learning rate scheduler. Currently, other than 'none', only the multistep LR is "
+                 "supported, specify like this: multistep-<milestones>[-<gamma>], e.g. "
+                 "'multistep-100,150-0.1'. Note: In federated experiments, the schedulers step "
+                 "once every round, not once every local epoch.")
 
         super().add_arguments(parser)
 
