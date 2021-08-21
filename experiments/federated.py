@@ -24,9 +24,13 @@ import torch
 
 import utils
 
+from . import optimizers
 from .experiment import BaseExperiment
 
 logger = logging.getLogger(__name__)
+
+
+ClientLRSchedulersType = Optional[Sequence[Optional[torch.optim.lr_scheduler._LRScheduler]]]
 
 
 class BaseFederatedExperiment(BaseExperiment):
@@ -56,6 +60,7 @@ class BaseFederatedExperiment(BaseExperiment):
             client_optimizers: Sequence[torch.optim.Optimizer],
             results_dir: pathlib.Path,
             device='cpu',
+            client_lr_schedulers: ClientLRSchedulersType = None,
             sqerror_reference: Optional[Tuple[torch.nn.Module, torch.optim.Optimizer]] = None,
             **params):
         """This constructor requires all client datasets, models and optimizers
@@ -76,6 +81,7 @@ class BaseFederatedExperiment(BaseExperiment):
         self.client_models = [model.to(device) for model in client_models]
         self.global_model = global_model.to(device)
         self.client_optimizers = client_optimizers
+        self.client_lr_schedulers = client_lr_schedulers
 
         self.client_dataloaders = [
             torch.utils.data.DataLoader(dataset, batch_size=self.params['batch_size'])
@@ -116,13 +122,24 @@ class BaseFederatedExperiment(BaseExperiment):
                  "Use with caution: this runs full gradient descent on the dataset, "
                  "so only use it if you're prepared to run full gradient descent.")
 
+        # The "-client" suffix on all of these arguments might seem redundant
+        # for now. It's explicit in case we decided to add optimizers at the
+        # server in future research.
         optimizer_args = parser.add_argument_group("Client optimizer parameters")
+        optimizer_args.add_argument("-o", "--optimizer-client", default='sgd',
+            choices=optimizers.optimizer_choices,
+            help="Optimizer algorithm at client")
         optimizer_args.add_argument("-lr", "--lr-client", type=float, default=1e-2,
             help="Learning rate at client")
         optimizer_args.add_argument("-mom", "--momentum-client", type=float, default=0.0,
-            help="Momentum of SGD at client")
+            help="Momentum of SGD at client (not used for Adam)")
         optimizer_args.add_argument("-wd", "--weight-decay-client", type=float, default=0.0,
-            help="Weight decay of SGD at client")
+            help="Weight decay of optimizer at client")
+        optimizer_args.add_argument("-lrsch", "--lr-scheduler-client", type=str, default=None,
+            help="Learning rate scheduler. Currently, only the multistep LR is supported, "
+                 "specify like this: multistep-<milestones>[-<gamma>], e.g. multistep-100,150-0.1. "
+                 "Note: In federated experiments, the schedulers step once every round, not once "
+                 "every local epoch.")
 
         super().add_arguments(parser)
 
@@ -157,15 +174,19 @@ class BaseFederatedExperiment(BaseExperiment):
         global_model = model_fn()
         client_models = [model_fn() for i in range(nclients)]
 
-        logger.debug(f"Optimizer arguments: lr {args.lr_client}, momentum {args.momentum_client},"
-                     f"weight decay {args.weight_decay_client}")
         client_optimizers = [
-            torch.optim.SGD(
+            optimizers.make_optimizer(
                 model.parameters(),
+                algorithm=args.optimizer_client,
                 lr=args.lr_client,
                 momentum=args.momentum_client,
                 weight_decay=args.weight_decay_client,
             ) for model in client_models
+        ]
+
+        client_lr_schedulers = [
+            optimizers.make_scheduler(args.lr_scheduler_client, optimizer)
+            for optimizer in client_optimizers
         ]
 
         if args.save_squared_error:
@@ -181,8 +202,13 @@ class BaseFederatedExperiment(BaseExperiment):
 
         params = cls.extract_params_from_args(args)
 
-        return cls(client_datasets, test_dataset, client_models, global_model, loss_fn, metric_fns,
-                   client_optimizers, results_dir, device, sqerror_reference, **params)
+        return cls(
+            client_datasets, test_dataset, client_models, global_model, loss_fn,
+            metric_fns, client_optimizers, results_dir,
+            device=device, client_lr_schedulers=client_lr_schedulers,
+            sqerror_reference=sqerror_reference,
+            **params,
+        )
 
     def train_clients(self):
         """Trains all clients through one round of the number of epochs specified
@@ -324,6 +350,15 @@ class BaseFederatedExperiment(BaseExperiment):
         Subclasses must implement this method."""
         raise NotImplementedError
 
+    def step_lr_schedulers(self):
+        """Steps all client learning rate schedulers."""
+        if self.client_lr_schedulers is None:
+            return
+        for i, scheduler in enumerate(self.client_lr_schedulers):
+            if scheduler:
+                self.records[f"lr_client{i}"] = scheduler.get_last_lr()[0]  # log before step
+                scheduler.step()
+
     def run(self):
         """Runs the experiment once."""
         nrounds = self.params['rounds']
@@ -337,6 +372,8 @@ class BaseFederatedExperiment(BaseExperiment):
 
             test_results = self.test()
             self.records.update(test_results)
+
+            self.step_lr_schedulers()
 
             logger.info(f"Round {r}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
             csv_logger.log(r, self.records)

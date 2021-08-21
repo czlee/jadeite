@@ -12,11 +12,14 @@ import json
 import logging
 import pathlib
 import time
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
 import torch
 
 import utils
+
+from . import optimizers
+
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +222,7 @@ class SimpleExperiment(BaseExperiment):
             metric_fns: Dict[str, Callable],
             optimizer: torch.optim.Optimizer,
             results_dir: pathlib.Path,
+            lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
             device='cpu',
             **params):
 
@@ -228,6 +232,7 @@ class SimpleExperiment(BaseExperiment):
         self.test_dataset = test_dataset
         self.model = model.to(device)
         self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
 
         self.train_dataloader = torch.utils.data.DataLoader(
             self.train_dataset,
@@ -241,12 +246,18 @@ class SimpleExperiment(BaseExperiment):
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
         optimizer_args = parser.add_argument_group("Optimizer parameters")
+        optimizer_args.add_argument("-o", "--optimizer", default='sgd',
+            choices=optimizers.optimizer_choices,
+            help="Optimizer algorithm")
         optimizer_args.add_argument("-l", "-lr", "--learning-rate", type=float, default=1e-2,
             help="Learning rate")
         optimizer_args.add_argument("-mom", "--momentum", type=float, default=0.0,
             help="Momentum of SGD")
         optimizer_args.add_argument("-wd", "--weight-decay", type=float, default=0.0,
             help="Weight decay of SGD")
+        optimizer_args.add_argument("-lrsch", "--lr-scheduler", type=str, default=None,
+            help="Learning rate scheduler. Currently, only the multistep LR is supported, "
+                 "specify like this: multistep-<milestones>[-<gamma>], e.g. multistep-100,150-0.1")
         super().add_arguments(parser)
 
     @classmethod
@@ -266,17 +277,29 @@ class SimpleExperiment(BaseExperiment):
         """
         model = model_fn()
         device = cls._interpret_cpu_arg(args.cpu)
-        logger.debug(f"Optimizer arguments: lr {args.learning_rate}, momentum {args.momentum}, "
-                     f"weight decay {args.weight_decay}")
-        optimizer = torch.optim.SGD(
+
+        optimizer = optimizers.make_optimizer(
             model.parameters(),
+            algorithm=args.optimizer,
             lr=args.learning_rate,
             momentum=args.momentum,
             weight_decay=args.weight_decay,
         )
+
+        lr_scheduler = optimizers.make_scheduler(args.lr_scheduler, optimizer)
+
         params = cls.extract_params_from_args(args)
-        return cls(train_dataset, test_dataset, model, loss_fn, metric_fns,
-                   optimizer, results_dir, device, **params)
+        return cls(
+            train_dataset, test_dataset, model, loss_fn, metric_fns, optimizer, results_dir,
+            lr_scheduler=lr_scheduler, device=device,
+            **params,
+        )
+
+    def step_lr_scheduler(self):
+        """Steps the learning rate scheduler."""
+        if self.lr_scheduler:
+            self.records['lr'] = self.lr_scheduler.get_last_lr()[0]  # log before step
+            self.lr_scheduler.step()
 
     def run(self):
         """Runs the experiment once."""
@@ -285,10 +308,13 @@ class SimpleExperiment(BaseExperiment):
 
         for i in range(nepochs):
             train_loss = self.train()
-            test_results = self.test()
-            test_results['train_loss'] = train_loss
-            logger.info(f"Epoch {i}: " + ", ".join(f"{k} {v:.7f}" for k, v in test_results.items()))
-            csv_logger.log(i, test_results)
+            self.records = self.test()
+            self.records['train_loss'] = train_loss
+
+            self.step_lr_scheduler()
+
+            logger.info(f"Epoch {i}: " + ", ".join(f"{k} {v:.7g}" for k, v in self.records.items()))
+            csv_logger.log(i, self.records)
             self.log_model_json(i, self.model)
 
         csv_logger.close()
