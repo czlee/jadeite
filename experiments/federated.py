@@ -279,6 +279,9 @@ class BaseFederatedExperiment(BaseExperiment):
         federated averaging, `values` would be the mean of what each client
         returns from `get_values_to_send()`.
 
+        This also synchronizes all of the client models with this global model,
+        since we don't model the downlink in these simulations.
+
         Subclasses can use this method to handle received values.
         """
 
@@ -296,7 +299,7 @@ class BaseFederatedExperiment(BaseExperiment):
             new_state_dict = self.unflatten_state_dict(values)
 
         self.global_model.load_state_dict(new_state_dict)
-        for model in self.client_models:
+        for model in self.client_models:  # sync client models
             model.load_state_dict(new_state_dict)
 
     def _setup_sqerror_reference(self, reference_model, reference_optimizer, device):
