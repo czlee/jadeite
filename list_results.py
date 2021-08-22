@@ -125,12 +125,17 @@ def is_composite_argument(key, value):
     return False
 
 
-def format_args_string(arguments, always_show=[]):
+def format_args_string(arguments, always_show=[], repeat_changed=False):
     args_items = sorted(arguments.items(), key=lambda item: not is_composite_argument(*item))
-    formatted_args = [
-        format_argument(key, value) for key, value in args_items
-        if DEFAULT_ARGUMENTS.get(key) != value or key in always_show
-    ]
+
+    formatted_args = []
+    for key, value in args_items:
+        if DEFAULT_ARGUMENTS.get(key) == value and key not in always_show:
+            continue
+        if key == 'repeat' and repeat_changed:
+            value = f"\033[1;35m{value}"
+        formatted_args.append(format_argument(key, value))
+
     return " ".join(formatted_args)
 
 
@@ -266,6 +271,19 @@ def detect_composite_status(directory, arguments):
     return unfinished, finished, expected
 
 
+def check_repeats_file(directory, arguments):
+    if (directory / "repeats").exists():
+        # override repeat with repeats file
+        try:
+            arguments['repeat'] = int(open(directory / "repeats").readline())
+        except (ValueError, FileNotFoundError):
+            return False
+        else:
+            return True
+    else:
+        return False
+
+
 def show_status_line(directory, if_after=None, always_show=[], filter_args={}):
     """Shows the status and arguments of the directory in a single line.
 
@@ -294,7 +312,8 @@ def show_status_line(directory, if_after=None, always_show=[], filter_args={}):
     if not matches_filter(filter_args, script, arguments):
         return
 
-    argsstring = format_args_string(arguments, always_show=always_show)
+    repeat_changed = check_repeats_file(directory, arguments)
+    argsstring = format_args_string(arguments, always_show=always_show, repeat_changed=repeat_changed)
     is_running = process_id is not None and psutil.pid_exists(process_id)
 
     if is_composite_directory(arguments):

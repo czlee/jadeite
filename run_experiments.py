@@ -30,6 +30,9 @@ import data
 import utils
 
 
+logger = logging.getLogger(__name__)
+
+
 # This defines the labels that are used in the experiment matrix, except for
 # 'iteration'/'--repeat', which is handled specially (because it is not an
 # experiment parameter and common to all experiment types). The main function
@@ -38,6 +41,36 @@ import utils
 # you must do is add a `matrix_args.add_argument(...)` line below, conditioned
 # on the label being in `matrix_labels`.
 all_matrix_labels = ['clients', 'noise']
+
+
+def write_nrepeats_to_file(results_dir, nrepeats):
+    with open(results_dir / "repeats", 'w') as f:
+        f.write(f"{nrepeats:d}\n")
+
+
+def check_if_finished(results_dir, iteration):
+    try:
+        with open(results_dir / "repeats", 'r') as f:
+            contents = f.readline()
+    except FileNotFoundError:
+        logger.error("Could not found 'repeats' file, continuing...")
+        return False
+
+    try:
+        nrepeats = int(contents)
+    except ValueError:
+        logger.error(f"Invalid 'repeats' file first line: {contents.strip()!r}, continuing...")
+        return False
+
+    if iteration >= nrepeats:
+        logger.info(f"Iteration {iteration} >= nrepeats {nrepeats}, stopping.")
+        return True
+
+    return False
+
+
+def check_immediate_stop(results_dir):
+    return (results_dir / "stop-now").exists()
 
 
 def run_experiments(experiment_class, description="Description not provided."):
@@ -75,28 +108,39 @@ def run_experiments(experiment_class, description="Description not provided."):
 
     matrix = [getattr(args, label).copy() for label in matrix_labels]
 
-    for i, *matrix_values in itertools.product(range(args.repeat), *matrix):
+    write_nrepeats_to_file(top_results_dir, args.repeat)
+    iteration = 0
 
-        matrix_dict = {}
-        title_strs = []
-        dirname_strs = []
+    while not check_if_finished(top_results_dir, iteration):
 
-        for label, value in zip(matrix_labels, matrix_values):
-            setattr(args, label, value)
-            matrix_dict[label] = value
-            title_strs.append(f"{label} {value}")
-            dirname_strs.append(f"{label}-{value}")
+        for matrix_values in itertools.product(*matrix):
 
-        matrix_dict['iteration'] = i
+            matrix_dict = {}
+            title_strs = []
+            dirname_strs = []
 
-        logging.info("=== " + ", ".join(f"{lab} {val}" for lab, val in matrix_dict.items()) + " ===")
-        results_dir = top_results_dir / "-".join(f"{lab}-{val}" for lab, val in matrix_dict.items())
-        results_dir.mkdir()
-        utils.log_arguments(args, results_dir, other_info=matrix_dict)
+            for label, value in zip(matrix_labels, matrix_values):
+                setattr(args, label, value)
+                matrix_dict[label] = value
+                title_strs.append(f"{label} {value}")
+                dirname_strs.append(f"{label}-{value}")
 
-        experiment = experiment_class.from_arguments(
-            train_dataset, test_dataset, model_class, loss_fn, metric_fns, results_dir, args)
-        experiment.run()
+            matrix_dict['iteration'] = iteration
+
+            logging.info("=== " + ", ".join(f"{lab} {val}" for lab, val in matrix_dict.items()) + " ===")
+            results_dir = top_results_dir / "-".join(f"{lab}-{val}" for lab, val in matrix_dict.items())
+            results_dir.mkdir()
+            utils.log_arguments(args, results_dir, other_info=matrix_dict)
+
+            experiment = experiment_class.from_arguments(
+                train_dataset, test_dataset, model_class, loss_fn, metric_fns, results_dir, args)
+            experiment.run()
+
+            if check_immediate_stop(top_results_dir):
+                logger.warning("'stop-now' file found, stopping immediately!")
+                exit()
+
+        iteration += 1
 
 
 if __name__ == "__main__":

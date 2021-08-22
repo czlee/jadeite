@@ -63,6 +63,18 @@ python overtheair.py --help
 
   This is sometimes useful for rerunning experiments.
 
+- `show_duration.py` prints the duration of each experiment in the given directory.
+
+### Extending or stopping repeated experiments early
+
+Most scripts take the `--repeat` or `-q` argument, which specifies how many times the experiment (or experiment matrix, if multiple values are specified for `--clients` or `--noise`) should be repeated. It is possible to change this while the script is running by overwriting the `repeats` file in the experiment directory with a new number.
+
+For example, if you had initially specified `-q 10` and it's currently up to iteration 5 (starting from 0), then writing `6` to `repeats` will stop it after it finishes the current iteration of the experiment matrix. Writing `20` to `repeats` will extend the experiment to 20 repetitions. An easy way to effect this is to use `echo 20 > latest/repeats`.
+
+You can also stop the script as soon as the current experiment is finished, without it having to get to the end of the current experiment matrix. To do this, create a `stop-now` file, for example, using `touch latest/stop-now`.
+
+How this works: The scripts check after each experiment whether the `stop-now` file exists, and checks the value in the `repeats` file after each full sweep of the experiment matrix.
+
 Coding principles
 -----------------
 I don't claim these to be best practice or anything, they're just what I was trying to do when writing this code.
