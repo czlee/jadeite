@@ -275,11 +275,15 @@ def check_repeats_file(directory, arguments):
     if (directory / "repeats").exists():
         # override repeat with repeats file
         try:
-            arguments['repeat'] = int(open(directory / "repeats").readline())
+            new_value = int(open(directory / "repeats").readline())
         except (ValueError, FileNotFoundError):
             return False
-        else:
+
+        if arguments['repeat'] != new_value:
+            arguments['repeat'] = new_value
             return True
+        else:
+            return False
     else:
         return False
 
