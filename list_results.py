@@ -45,6 +45,9 @@ DEFAULT_ARGUMENTS = {
     'clients': 10,
     'lr_client': 0.01,
     'momentum_client': 0.0,
+    'weight_decay_client': 0.0,
+    'optimizer_client': 'sgd',
+    'lr_scheduler_client': 'none',
     'noise': 1.0,
     'power': 1.0,
     'parameter_radius': 1.0,
@@ -67,6 +70,7 @@ DEFAULT_ARGUMENTS = {
     'weight_decay': 0.0,
     'momentum': 0.0,
     'optimizer': 'sgd',
+    'lr_scheduler': 'none',
 }
 
 
