@@ -323,35 +323,36 @@ def show_status_line(directory, if_after=None, always_show=[], filter_args={}):
     repeat_changed = check_repeats_file(directory, arguments)
     argsstring = format_args_string(arguments, always_show=always_show, repeat_changed=repeat_changed)
     is_running = process_id is not None and psutil.pid_exists(process_id)
+    stopnow = "\033[0;31m!\033[0m" if (directory / "stop-now").exists() else " "
 
     if is_composite_directory(arguments):
         unfinished, finished, expected = detect_composite_status(directory, arguments)
         if is_running:
             color = "\033[0;32m"
-            status = f"{finished:>3}/{expected:<3} r{unfinished}"
+            status = f"{finished:>3}/{expected:<3}{stopnow}r{unfinished}"
         elif unfinished > 0:
             # not running, but at least one is unfinished
             color = "\033[1;35m"
-            status = f"{finished:>3}/{expected:<3} u{unfinished}"
+            status = f"{finished:>3}/{expected:<3}{stopnow}u{unfinished}"
         elif finished == expected:
             # seems to be done and dusted
             color = ""
-            status = f"{finished:>3}/{expected:<3}   "
+            status = f"{finished:>3}/{expected:<3}{stopnow}  "
         else:
             # seems to be incomplete but no single run is unfinished
             color = "\033[1;33m"
-            status = f"{finished:>3}/{expected:<3} u{unfinished}"
+            status = f"{finished:>3}/{expected:<3}{stopnow}u{unfinished}"
     elif is_running:
-        status = "        r "
+        status = f"       {stopnow}r "
         color = "\033[0;32m"
     elif not has_started(directory):
-        status = "        ? "
+        status = f"       {stopnow}? "
         color = "\033[0;31m"
     elif not has_finished(directory):
-        status = "        u "
+        status = f"       {stopnow}u "
         color = "\033[0;33m"
     else:
-        status = ""
+        status = f"       {stopnow}  "
         color = "\033[0;34m"
 
     print(f"{color}{dirname:16} {commit} {status:10} {script:<17}\033[0m  {argsstring}")
