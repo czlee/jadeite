@@ -184,7 +184,8 @@ class QuantizationWithEqualBinsMixin:
     @classmethod
     def add_arguments(cls, parser):
         quant_args = parser.add_argument_group(title="Quantization options")
-        quant_args.add_argument("-zbs", "--zero-bits-strategy", choices=['min-one', 'read-zero'],
+        quant_args.add_argument("-zbs", "--zero-bits-strategy",
+            choices=['min-one', 'read-zero', 'exclude'],
             help="What to do if there aren't enough bits. min-one = require at "
                  "least one bit per parameter, even if it violates the power "
                  "constraint. read-zero = interpret parameters without bits as "
@@ -211,7 +212,7 @@ class QuantizationWithEqualBinsMixin:
 
         if self.params['zero_bits_strategy'] == 'min-one':
             nbits = torch.maximum(nbits, torch.ones_like(nbits))
-        elif self.params['zero_bits_strategy'] == 'read-zero':
+        elif self.params['zero_bits_strategy'] in ['read-zero', 'exclude']:
             nbits[nbits == 0] = float('nan')
 
         nbins = 2 ** nbits - 1
@@ -304,8 +305,24 @@ class QuantizationWithEqualBinsMixin:
         assert indices.shape == nbits.shape, f"shape mismatch: {indices.shape} vs {nbits.shape}"
         binwidths = self.get_binwidths(nbits, qrange)
         values = indices * binwidths - qrange
-        values[binwidths.isnan()] = 0        # override special case
+
+        if self.params['zero_bits_strategy'] != 'exclude':
+            values[binwidths.isnan()] = 0        # override special case
+
         return values
+
+    def compute_client_average(self, all_unquantized):
+        if self.params['zero_bits_strategy'] == 'exclude':
+            # This replicates the np.nanmean() function (without using numpy), and can be
+            # replaced when https://github.com/pytorch/pytorch/issues/21987 is closed.
+            all_clients = torch.stack(all_unquantized, 0)
+            nonnans_per_column = (~all_clients.isnan()).sum(0)
+            client_average = all_clients.nansum(dim=0) / nonnans_per_column
+            client_average = client_average.nan_to_num(0)
+            return client_average
+
+        else:
+            return torch.stack(all_unquantized, 0).mean(0)
 
 
 class SimpleQuantizationFederatedExperiment(
@@ -359,7 +376,7 @@ class SimpleQuantizationFederatedExperiment(
             unquantized = self.unquantize(indices, lengths, qrange)
             all_unquantized.append(unquantized)
 
-        client_average = torch.stack(all_unquantized, 0).mean(0)
+        client_average = self.compute_client_average(all_unquantized)
         self.update_global_model(client_average)
 
 
@@ -449,7 +466,7 @@ class DynamicRangeQuantizationFederatedExperiment(
             unquantized = self.unquantize(indices, lengths, qrange)
             all_unquantized.append(unquantized)
 
-        client_average = torch.stack(all_unquantized, 0).mean(0)
+        client_average = self.compute_client_average(all_unquantized)
         self.update_global_model(client_average)
 
         if self.current_round % self.params['qrange_update_period'] == 0:
