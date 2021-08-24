@@ -402,8 +402,8 @@ class DynamicRangeMixin(ExponentialMovingAverageMixin):
     default_params_to_add = ExponentialMovingAverageMixin.default_params_to_add.copy()
     default_params_to_add.update({
         'qrange_update_period': 1,
-        'qrange_param_quantile': 0.9,
-        'qrange_client_quantile': 0.9,
+        'qrange_param_quantile': 1.0,
+        'qrange_client_quantile': 1.0,
     })
 
     def __init__(self, *args, **kwargs):
