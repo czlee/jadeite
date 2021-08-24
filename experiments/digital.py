@@ -517,7 +517,7 @@ class DynamicRangeFederatedExperiment(DynamicRangeMixin, BaseFederatedExperiment
         values = self.get_values_to_send(model)
         self.update_qrange_buffer(client, values)
         qrange = self.current_qrange
-        clipped = -values.clip(-qrange, qrange)
+        clipped = values.clip(-qrange, qrange)
         return clipped
 
     def server_receive(self, transmissions):
