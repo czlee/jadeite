@@ -218,7 +218,7 @@ class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTh
     default_params.update(ExponentialMovingAverageMixin.default_params_to_add)
     default_params.update({
         'power_update_period': 1,
-        'power_quantile': 0.9,
+        'power_quantile': 1.0,
         'power_factor': 0.9,
     })
 
