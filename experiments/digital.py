@@ -435,6 +435,26 @@ class DynamicRangeMixin(ExponentialMovingAverageMixin):
 
         super().add_arguments(parser)
 
+    def update_qrange_buffer(self, client: int, values: torch.Tensor):
+        """Adds the current values to the dynamic range buffer. This should be
+        called by subclasses in their implementation of client transmission,
+        using the `values` returned by `get_values_to_send()`."""
+        q = self.params['qrange_param_quantile']
+        value_at_quantile = torch.quantile(values, q).item()
+        self.records['param_quantile'] = value_at_quantile
+        self.update_ema_buffer(client, value_at_quantile)
+
+    def update_qrange(self):
+        """Updates the current dynamic range. This should be called by
+        subclasses in their implementation of server aggregation.
+        """
+        if self.current_round % self.params['qrange_update_period'] == 0:
+            # update the current quantization range by looking at all the clients
+            # (i.e. the clients "sent this information through a side channel")
+            q = self.params['qrange_client_quantile']
+            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
+            self.current_qrange = ema_at_quantile
+
 
 class DynamicRangeQuantizationFederatedExperiment(
         QuantizationWithEqualBinsMixin,
@@ -445,17 +465,17 @@ class DynamicRangeQuantizationFederatedExperiment(
     dynamically adjusts the quantization range.
     """
 
+    # For historical reasons (i.e., because this was originally part of
+    # `DynamicRangeQuantizationFederatedExperiment`), the dynamic range is
+    # called `qrange`.
+
     default_params = BaseDigitalFederatedExperiment.default_params.copy()
     default_params.update(QuantizationWithEqualBinsMixin.default_params_to_add)
     default_params.update(DynamicRangeMixin.default_params_to_add)
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
-
-        q = self.params['qrange_param_quantile']
-        value_at_quantile = torch.quantile(values, q).item()
-        self.records['param_quantile'] = value_at_quantile
-        self.update_ema_buffer(client, value_at_quantile)
+        self.update_qrange_buffer(client, values)
 
         lengths = self.bits_per_tx_parameter(client)
         assert values.shape == lengths.shape, f"shape mismatch: {values.shape} vs {lengths.shape}"
@@ -475,13 +495,7 @@ class DynamicRangeQuantizationFederatedExperiment(
 
         client_average = self.compute_client_average(all_unquantized)
         self.update_global_model(client_average)
-
-        if self.current_round % self.params['qrange_update_period'] == 0:
-            # update the current quantization range by looking at all the clients
-            # (i.e. the clients "sent this information through a side channel")
-            q = self.params['qrange_client_quantile']
-            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
-            self.current_qrange = ema_at_quantile
+        self.update_qrange()
 
 
 class DynamicRangeFederatedExperiment(DynamicRangeMixin, BaseFederatedExperiment):
@@ -501,26 +515,14 @@ class DynamicRangeFederatedExperiment(DynamicRangeMixin, BaseFederatedExperiment
 
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
-
-        q = self.params['qrange_param_quantile']
-        value_at_quantile = torch.quantile(values, q).item()
-        self.records['param_quantile'] = value_at_quantile
-        self.update_ema_buffer(client, value_at_quantile)
-
+        self.update_qrange_buffer(client, values)
         qrange = self.current_qrange
         clipped = -values.clip(-qrange, qrange)
         return clipped
 
     def server_receive(self, transmissions):
         qrange = self.current_qrange
-        self.records['quantization_range'] = qrange  # take note of quantization range
-
+        self.records['dynamic_range'] = qrange  # take note of quantization range
         client_average = torch.stack(transmissions, 0).mean(0)
         self.update_global_model(client_average)
-
-        if self.current_round % self.params['qrange_update_period'] == 0:
-            # update the current quantization range by looking at all the clients
-            # (i.e. the clients "sent this information through a side channel")
-            q = self.params['qrange_client_quantile']
-            ema_at_quantile = torch.quantile(torch.tensor(self.ema_buffer), q).item()
-            self.current_qrange = ema_at_quantile
+        self.update_qrange()
