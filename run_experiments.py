@@ -83,7 +83,9 @@ def run_experiments(experiment_class, description="Description not provided."):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     experiment_class.add_arguments(parser)
     parser.add_argument("-d", "--dataset", choices=data.DATASET_CHOICES, default='epsilon',
-        help="Dataset (and associated model, loss and metric) to use")
+        metavar='DATASET',
+        help="Dataset, model, loss and metric to use (despite the name, this argument "
+             "specifies all of them). Valid choices: " + ", ".join(data.DATASET_CHOICES))
 
     matrix_args = parser.add_argument_group("Experiment matrix arguments")
     matrix_args.add_argument("-q", "--repeat", type=int, default=1,

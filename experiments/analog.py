@@ -241,9 +241,8 @@ class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTh
         power_args.add_argument("-pup", "--power-update-period", type=int, metavar="PERIOD",
             help="Number of rounds between power control updates")
         power_args.add_argument("-pq", "--power-quantile", type=float, metavar="QUANTILE",
-            help="Quantile among clients to take for power control, should generally be between "
-                 "0 and 1 (normally closer to 1 -- the most conservative option is to take the "
-                 "maximum among clients)")
+            help="Quantile among clients to take for power control, between 0 and 1 "
+                 "(1 means take the maximum among clients)")
         power_args.add_argument("-pf", "--power-factor", type=float, metavar="FACTOR",
             help="Divide the inferred parameter radius by this value before use, should "
                  "generally be between 0 and 1 (normally closer to 1). This is called the "

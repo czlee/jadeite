@@ -189,7 +189,7 @@ class QuantizationWithEqualBinsMixin:
             help="What to do if there aren't enough bits. min-one = require at "
                  "least one bit per parameter, even if it violates the power "
                  "constraint. read-zero = interpret parameters without bits as "
-                 "zero.")
+                 "zero. exclude = exclude that client's parameter when averaging.")
         quant_args.add_argument("-rdm", "--rounding-method", choices=['stochastic', 'deterministic'],
             help="Rounding method. stochastic = round up or down randomly so "
                  "that the rounded value is equal to the true value in "
@@ -425,13 +425,11 @@ class DynamicRangeMixin(ExponentialMovingAverageMixin):
         qrange_args.add_argument("-qup", "--qrange-update-period", type=int, metavar="PERIOD",
             help="Number of rounds between quantization range updates")
         qrange_args.add_argument("-qpq", "--qrange-param-quantile", type=float, metavar="QUANTILE",
-            help="Quantile among parameters to take to determine quantization range, should "
-                 "generally be between 0 and 1 (normally closer to 1 -- the most conservative "
-                 "option is to take the maximum among parameters) (this is done at each client)")
+            help="Quantile among parameters to take to determine quantization range, between 0 and 1 "
+                 "(1 means take the maximum parameter; this is done at each client)")
         qrange_args.add_argument("-qcq", "--qrange-client-quantile", type=float, metavar="QUANTILE",
-            help="Quantile among clients to take to determine quantization range, should "
-                 "generally be between 0 and 1 (normally closer to 1 -- the most conservative "
-                 "option is to take the maximum among clients)")
+            help="Quantile among clients to take to determine quantization range, between 0 and 1 "
+                 "(1 means take the maximum among clients)")
 
         super().add_arguments(parser)
 
