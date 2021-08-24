@@ -209,6 +209,7 @@ class QuantizationWithEqualBinsMixin:
         """
         nbits = nbits.type(torch.float64)
         assert torch.equal(nbits, nbits.floor())
+        assert torch.lt(nbits, 64).all(), "can't quantize to more than 63 bits!"
 
         if self.params['zero_bits_strategy'] == 'min-one':
             nbits = torch.maximum(nbits, torch.ones_like(nbits))
