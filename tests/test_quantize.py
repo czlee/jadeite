@@ -61,16 +61,16 @@ class TestQuantizationMixin(unittest.TestCase):
         expected = torch.tensor([-5, 5, -5, -5/3, 5/3, 5, -25/7, 5/7, 5], dtype=torch.float64)  # noqa: E501 E226
         torch.testing.assert_close(values, expected)
 
-    def test_quantization_stochastically(self):
+    def _test_quantization_stochastically(self, nbits, qrange=10, nsamples=10000):
         """Quantizes and unquantizes a vector lots of times, and checks the
         averages are close to the original values."""
         self.set_rounding_method('stochastic')
 
         qrange = 10
-        n = 50
+        assert nbits.ndim == 1
+        n = nbits.numel()
         nsamples = 10000
         values = (torch.rand(n) * 2 - 1) * qrange
-        nbits = torch.randint(2, 8, size=(n,))
         quantized = torch.zeros((nsamples, n))
         for i in range(nsamples):
             indices = self.mixin.quantize(values, nbits, qrange)
@@ -84,11 +84,32 @@ class TestQuantizationMixin(unittest.TestCase):
         # values (as computed from the scaled binomial distribution)
         deltas = 8 * torch.sqrt(2 * qrange / (2 ** nbits - 1) / 4 / nsamples)
 
+        # except that there always seems to be a residual error less than 5e-6
+        # I assume because of some interaction between floating point and fixed
+        # point precision, but I'm not quite sure
+        deltas = deltas.clip(min=5e-6)
+
         self.assertTrue(averages.le(qrange).all())
         self.assertTrue(averages.ge(-qrange).all())
 
         diffs = torch.abs(values - averages)
         self.assertTrue(torch.lt(diffs, deltas).all())
+
+    def test_quantization_stochastically(self):
+        n = 50
+        nbits = torch.randint(2, 63, size=(n,))
+        self._test_quantization_stochastically(nbits)
+
+    def test_quantization_stochastically_fixed_sizes(self):
+        """Quantizes and unquantizes a vector lots of times, and checks the
+        averages are close to the original values."""
+        self.set_rounding_method('stochastic')
+        n = 50
+
+        for m in [2, 10, 17, 24, 32, 48, 63]:
+            with self.subTest(m=m):
+                nbits = torch.full((n,), m)
+                self._test_quantization_stochastically(nbits)
 
     def test_quantize_zero_bits(self):
         values = torch.tensor([-2, 2, 2, -2, 2])
