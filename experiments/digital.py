@@ -404,6 +404,7 @@ class DynamicRangeMixin(ExponentialMovingAverageMixin):
         'qrange_update_period': 1,
         'qrange_param_quantile': 1.0,
         'qrange_client_quantile': 1.0,
+        'qrange_initial': 1.0,
     })
 
     def __init__(self, *args, **kwargs):
@@ -417,7 +418,7 @@ class DynamicRangeMixin(ExponentialMovingAverageMixin):
             logger.error("Dynamic quantization range client quantile must be between 0 and 1, found: "
                          f"{self.params['qrange_client_quantile']}")
 
-        self.current_qrange = 1.0
+        self.current_qrange = self.params['qrange_initial']
 
     @classmethod
     def add_arguments(cls, parser):
@@ -430,6 +431,8 @@ class DynamicRangeMixin(ExponentialMovingAverageMixin):
         qrange_args.add_argument("-qcq", "--qrange-client-quantile", type=float, metavar="QUANTILE",
             help="Quantile among clients to take to determine quantization range, between 0 and 1 "
                  "(1 means take the maximum among clients)")
+        qrange_args.add_argument("-qin", "--qrange-initial", type=float, metavar="Q",
+            help="Initial quantization range")
 
         super().add_arguments(parser)
 
