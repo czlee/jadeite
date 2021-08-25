@@ -220,6 +220,7 @@ class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTh
         'power_update_period': 1,
         'power_quantile': 1.0,
         'power_factor': 0.9,
+        'parameter_radius_initial': 1.0,
     })
 
     def __init__(self, *args, **kwargs):
@@ -233,7 +234,7 @@ class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTh
             logger.warning("Dynamic power factor should normally be between 0 and 1, found: "
                            f"{self.params['power_factor']}")
 
-        self.current_parameter_radius = 1.0
+        self.current_parameter_radius = self.params['parameter_radius_initial']
 
     @classmethod
     def add_arguments(cls, parser):
@@ -248,6 +249,8 @@ class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTh
                  "generally be between 0 and 1 (normally closer to 1). This is called the "
                  "power factor because it has the effect of scaling the power by this factor, "
                  "so e.g. a factor of 0.8 would effectively scale down power by 20%%")
+        power_args.add_argument("-Bin", "--parameter-radius-initial", type=float, metavar="B",
+            help="Initial parameter radius, B (before dynamic power adjustment)")
 
         super().add_arguments(parser)
 
