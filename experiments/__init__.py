@@ -12,3 +12,4 @@ from .digital import (
 from .experiment import SimpleExperiment
 from .federated import FederatedAveragingExperiment
 from .analog import OverTheAirExperiment, DynamicPowerOverTheAirExperiment
+from .simple_variants import SimpleExperimentWithNoise
