@@ -47,6 +47,7 @@ class BaseFederatedExperiment(BaseExperiment):
         'rounds': 20,
         'clients': 10,
         'send': 'deltas',
+        'client_sync': True,
     })
 
     def __init__(
@@ -121,6 +122,9 @@ class BaseFederatedExperiment(BaseExperiment):
             help="Save the squared error of the 'true' values to be sent in each round. "
                  "Use with caution: this runs full gradient descent on the dataset, "
                  "so only use it if you're prepared to run full gradient descent.")
+        federated_args.add_argument("--no-client-sync", action="store_false", dest="client_sync",
+            help="Don't synchronize clients in between rounds (this is a debugging "
+                 "option and shouldn't generally be used)")
 
         # The "-client" suffix on all of these arguments might seem redundant
         # for now. It's explicit in case we decided to add optimizers at the
@@ -299,8 +303,11 @@ class BaseFederatedExperiment(BaseExperiment):
             new_state_dict = self.unflatten_state_dict(values)
 
         self.global_model.load_state_dict(new_state_dict)
-        for model in self.client_models:  # sync client models
-            model.load_state_dict(new_state_dict)
+        if self.params['client_sync']:
+            for model in self.client_models:  # sync client models
+                model.load_state_dict(new_state_dict)
+        else:
+            logger.warning("Skipping client synchronization")
 
     def _setup_sqerror_reference(self, reference_model, reference_optimizer, device):
         """Sets up reference model, dataset and optimizer for squared error
