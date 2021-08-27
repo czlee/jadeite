@@ -23,7 +23,10 @@ from pathlib import Path
 import psutil
 
 from config import RESULTS_DIRECTORY
-from run_experiments import all_matrix_labels
+
+# copied from run_experiments.py to avoid needing all the main packages
+# (this allows this to be run from a symlink in kyanite)
+all_matrix_labels = ['clients', 'noise']
 
 ARGUMENT_ABBREVIATIONS = {
     'noise': 'σₙ²',
