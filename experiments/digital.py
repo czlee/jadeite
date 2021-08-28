@@ -353,6 +353,12 @@ class SimpleQuantizationFederatedExperiment(
         'quantization_range': 1.0,
     })
 
+    description = """\
+        Digital over-the-air scheme with (stochastic by default) quantization
+        over a fixed quantization range (specified as a parameter ahead of
+        time). This is the most basic version of the digital scheme.
+    """
+
     @classmethod
     def add_arguments(cls, parser):
         simple_quant_args = parser.add_argument_group(title="Simple quantization parameters")
@@ -474,6 +480,12 @@ class DynamicRangeQuantizationFederatedExperiment(
     default_params.update(QuantizationWithEqualBinsMixin.default_params_to_add)
     default_params.update(DynamicRangeMixin.default_params_to_add)
 
+    description = """\
+        Digital over-the-air scheme that implements a simple form of dynamic
+        quantization range adjustment to try to make full use of the bits
+        available.
+    """
+
     def client_transmit(self, client: int, model: torch.nn.Module) -> torch.Tensor:
         values = self.get_values_to_send(model)
         self.update_qrange_buffer(client, values)
@@ -506,6 +518,12 @@ class DynamicRangeFederatedExperiment(DynamicRangeMixin, BaseFederatedExperiment
 
     default_params = BaseFederatedExperiment.default_params.copy()
     default_params.update(DynamicRangeMixin.default_params_to_add)
+
+    description = """\
+        Unconstrained communication but with values clamped to a range that is
+        dynamically adjusted in the same way as dynquant. Intended as
+        debugging/sanity check for dynquant.
+    """
 
     def transmit_and_aggregate(self):
         """Receives the numbers errorlessly at the server and updates the model

@@ -442,6 +442,10 @@ class FederatedAveragingExperiment(BaseFederatedExperiment):
     a little bit more complicated.
     """
 
+    description = """\
+        Federated averaging with unconstrained communication.
+    """
+
     def transmit_and_aggregate(self):
         """Aggregates client models."""
         client_values = [self.get_values_to_send(model) for model in self.client_models]

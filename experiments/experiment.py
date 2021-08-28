@@ -33,6 +33,8 @@ class BaseExperiment:
         'save_models': False,
     }
 
+    description = "<description not provided>"
+
     def __init__(self,
             loss_fn: Callable,
             metric_fns: Dict[str, Callable],
@@ -212,6 +214,8 @@ class SimpleExperiment(BaseExperiment):
     """Class for a simple non-federated experiment."""
 
     default_params = BaseExperiment.default_params.copy()
+
+    description = "Just plain machine learning, nothing federated about it."
 
     def __init__(
             self,
