@@ -74,6 +74,7 @@ DEFAULT_ARGUMENTS = {
     'momentum': 0.0,
     'optimizer': 'sgd',
     'lr_scheduler': 'none',
+    'client_sync': True,
 }
 
 
