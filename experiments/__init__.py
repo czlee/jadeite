@@ -11,7 +11,7 @@ from .digital import (
 )
 from .experiment import SimpleExperiment
 from .federated import FederatedAveragingExperiment
-from .simple_variants import SimpleExperimentWithNoise
+from .noisy import FederatedAveragingWithNoiseExperiment, SimpleWithNoiseExperiment
 
 
 experiments_by_name = {
@@ -29,5 +29,6 @@ experiments_by_name = {
     'dynrange': DynamicRangeFederatedExperiment,
 
     # other experiments
-    'addnoise': SimpleExperimentWithNoise,
+    'addnoise': SimpleWithNoiseExperiment,
+    'fednoise': FederatedAveragingWithNoiseExperiment,
 }
