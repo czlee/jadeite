@@ -19,6 +19,11 @@ class SimpleExperimentWithNoise(SimpleExperiment):
         'noise': 1.0,
     })
 
+    description = """\
+        Non-federated machine learning, but with Gaussian noise added to the
+        model just before every training round.
+    """
+
     @classmethod
     def add_arguments(cls, parser):
         parser.add_argument("-N", "--noise", type=float,
