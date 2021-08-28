@@ -94,6 +94,12 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
         'parameter_radius': 1.0,
     })
 
+    description = """\
+        Simple analog over-the-air scheme using a fixed parameter radius
+        (specified as a parameter ahead of time). This is the most basic version
+        of the analog scheme.
+    """
+
     @classmethod
     def add_arguments(cls, parser):
         ota_args = parser.add_argument_group(title="Basic over-the-air parameters")
@@ -222,6 +228,11 @@ class DynamicPowerOverTheAirExperiment(ExponentialMovingAverageMixin, BaseOverTh
         'power_factor': 0.9,
         'parameter_radius_initial': 1.0,
     })
+
+    description = """\
+        Analog over-the-air scheme that implements a simple form of dynamic
+        power scaling to ensure that all the available power is (roughly) used.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

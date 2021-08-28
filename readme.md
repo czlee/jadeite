@@ -34,19 +34,25 @@ Usage
 
 ### Experiments
 
-The main scripts for running experiments are:
+The entry script for running experiments is `run.py`. It takes a subcommand, a short name for the experiment. Currently, the experiments are:
 
-- `simple.py`, which runs simple vanilla gradient descent, no federation involved.
-- `fedavg.py`, which runs federated averaging without communication constraints.
-- `overtheair.py`, which runs a simple version of our over-the-air analog scheme.
-- `dynpower.py`, which runs a version of our analog scheme with dynamic power scaling.
-- `stocquant.py`, which runs a stochastic quantization-based digital scheme.
-- `dynquant.py`, which runs a digital scheme with dynamically adjusted (stochastic) quantization.
+- `simple`, which runs simple vanilla gradient descent, no federation involved.
+- `fedavg`, which runs federated averaging without communication constraints.
+- `overtheair`, which runs a simple version of our over-the-air analog scheme.
+- `dynpower`, which runs a version of our analog scheme with dynamic power scaling.
+- `stocquant`, which runs a stochastic quantization-based digital scheme.
+- `dynquant`, which runs a digital scheme with dynamically adjusted (stochastic) quantization.
+- `dynrange`, which runs the same dynamic quantization as `dynquant`, but with unconstrained communication.
 
-All of these scripts have `--help` available, so for example:
+To start an experiment, use, for example:
+```bash
+python run.py dynpower --dataset=cifar10-simple
+```
+
+All of these subcommands have `--help` available, so for example:
 
 ```bash
-python overtheair.py --help
+python run.py dynpower --help
 ```
 
 ### Convenience scripts

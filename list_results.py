@@ -121,6 +121,11 @@ def process_arguments(argsfile):
         commit += " "
     process_id = args_dict.get('process_id')
     arguments = args_dict.get('args', {})
+
+    # This is the new version
+    if script == 'run.py' and 'experiment' in arguments:
+        script = arguments.pop('experiment')
+
     return script, started, commit, process_id, arguments
 
 

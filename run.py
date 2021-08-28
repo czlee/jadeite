@@ -5,15 +5,9 @@ clients specified with the `--clients` option, and repeats the experiments the
 number of times specified in `--repeat`. Each experiment is saved to a new
 subdirectory of the automatically created results directory.
 
-This script isn't meant to be invoked directly. Instead, other scripts in this
-directory reference the `run_experiments()` function in this module, passing
-in the name of a class. This helps reduce boilerplate code, while retaining
-clarity about which script does what.
-
 Note: This class assumes that the class given has the form of a subclass of
 `BaseFederatedExperiment`, i.e. that it takes the arguments that
-`BaseFederatedExperiment.from_arguments()` takes. It doesn't work with
-`SimpleExperiment`.
+`BaseFederatedExperiment.from_arguments()` takes.
 """
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
@@ -23,11 +17,14 @@ Note: This class assumes that the class given has the form of a subclass of
 import argparse
 import itertools
 import logging
+import shutil
+import textwrap
 
 import coloredlogs
 
 import data
 import utils
+from experiments import experiments_by_name
 
 
 logger = logging.getLogger(__name__)
@@ -73,33 +70,77 @@ def check_immediate_stop(results_dir):
     return (results_dir / "stop-now").exists()
 
 
-def run_experiments(experiment_class, description="Description not provided."):
+def make_top_level_description():
+    """Constructs the description for the top-level parser. This lists each of
+    the experiment classes with the short descriptions (hopefully) provided in
+    the `description` attribute of the classes."""
 
-    matrix_labels = [label for label in all_matrix_labels if label in experiment_class.default_params]
+    width, _ = shutil.get_terminal_size()
+
+    intro = textwrap.dedent("""\
+        Runs experiments. Provide one of the subcommands listed below.
+        Use --help on subcommands to see help for that subcommand.
+    """)
+    lines = textwrap.wrap(intro, width=width)
+    lines.extend(['', 'subcommands:'])
+
+    max_name_length = max(len(name) for name in experiments_by_name.keys())
+    indent = max_name_length + 2
+
+    for name, experiment_class in experiments_by_name.items():
+        text = name.ljust(indent) + textwrap.dedent(experiment_class.description)
+        wrapped = textwrap.wrap(text, width=width,
+            initial_indent="  ", subsequent_indent=" " * (indent + 2))
+        lines.extend(wrapped)
+        lines.append('')
+
+    return "\n".join(lines)
+
+
+def make_top_level_parser():
+    """Constructs the top-level parser. This parser treats each different
+    experiment class as a subcommand, collecting arguments from the experiment
+    class."""
 
     parser = argparse.ArgumentParser(
-        description=description,
-        conflict_handler='resolve',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    experiment_class.add_arguments(parser)
-    parser.add_argument("-d", "--dataset", choices=data.DATASET_CHOICES, default='epsilon',
-        metavar='DATASET',
-        help="Dataset, model, loss and metric to use (despite the name, this argument "
-             "specifies all of them). Valid choices: " + ", ".join(data.DATASET_CHOICES))
+        description=make_top_level_description(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest='experiment', required=True)
 
-    matrix_args = parser.add_argument_group("Experiment matrix arguments")
-    matrix_args.add_argument("-q", "--repeat", type=int, default=1,
-        help="Number of times to repeat experiment")
+    for name, experiment_class in experiments_by_name.items():
+        subparser = subparsers.add_parser(name,
+            description=experiment_class.description,
+            conflict_handler='resolve',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    if 'clients' in matrix_labels:
-        matrix_args.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
-            help="Number of clients, n")
+        subparser.add_argument("-d", "--dataset", choices=data.DATASET_CHOICES, default='epsilon',
+            metavar='DATASET',
+            help="Dataset, model, loss and metric to use (despite the name, this argument "
+                 "specifies all of them). Valid choices: " + ", ".join(data.DATASET_CHOICES))
 
-    if 'noise' in matrix_labels:
-        matrix_args.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
-            help="Noise level (variance), σₙ²")
+        # Add all arguments for this experiment class
+        experiment_class.add_arguments(subparser)
 
-    args = parser.parse_args()
+        # Override --clients and --noise, if present, with arguments allowing many values
+        matrix_args = subparser.add_argument_group("Experiment matrix arguments")
+        matrix_args.add_argument("-q", "--repeat", type=int, default=1,
+            help="Number of times to repeat experiment")
+
+        if 'clients' in experiment_class.default_params:
+            matrix_args.add_argument("-n", "--clients", type=int, nargs='+', default=[10],
+                help="Number of clients, n")
+
+        if 'noise' in experiment_class.default_params:
+            matrix_args.add_argument("-N", "--noise", type=float, nargs='+', default=[1.0],
+                help="Noise level (variance), σₙ²")
+
+    return parser
+
+
+def run_experiments(args):
+
+    experiment_class = experiments_by_name[args.experiment]
 
     coloredlogs.install(level=logging.DEBUG,
         fmt="%(asctime)s %(levelname)s %(message)s", milliseconds=True)
@@ -108,6 +149,7 @@ def run_experiments(experiment_class, description="Description not provided."):
 
     train_dataset, test_dataset, model_class, loss_fn, metric_fns = data.get_datasets_etc(args.dataset)
 
+    matrix_labels = [label for label in all_matrix_labels if label in experiment_class.default_params]
     matrix = [getattr(args, label).copy() for label in matrix_labels]
 
     write_nrepeats_to_file(top_results_dir, args.repeat)
@@ -146,4 +188,6 @@ def run_experiments(experiment_class, description="Description not provided."):
 
 
 if __name__ == "__main__":
-    print("Use one of the convenience scripts, like dynpower.py or dynquant.py.")
+    parser = make_top_level_parser()
+    args = parser.parse_args()
+    run_experiments(args)
