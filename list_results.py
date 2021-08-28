@@ -205,6 +205,14 @@ def has_finished(directory):
 
 
 def parse_start_time(args):
+
+    # the default start time depends on whether args.dir was given
+    if args.recent is None and args.after is None and args.all is False:
+        if args.dir is None:
+            args.recent = '1d'
+        else:
+            args.all = True
+
     if args.all:
         return None
 
@@ -395,7 +403,7 @@ def matches_filter(filter_args, script, arguments):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("dir", type=Path, nargs='?', default=RESULTS_DIRECTORY,
+    parser.add_argument("dir", type=Path, nargs='?', default=None,
         help=f"Results directory (default: {RESULTS_DIRECTORY})")
     parser.add_argument("-s", "--show", nargs='+', default=[], metavar="ARG",
         help="Always show these arguments, even if equal to the default")
@@ -405,7 +413,7 @@ if __name__ == "__main__":
              "spec, e.g. rounds=150")
 
     when = parser.add_mutually_exclusive_group()
-    when.add_argument("-r", "--recent", type=str, default='1d', metavar="PERIOD",
+    when.add_argument("-r", "--recent", type=str, default=None, metavar="PERIOD",
         help="Only show directories less than a day old, or less than a specified "
              "period of time, e.g. 2d for 2 days, 3h for 3 hours, 1d5h for 1 day "
              "5 hours. This is the default, with a period of 1 day.")
@@ -416,7 +424,9 @@ if __name__ == "__main__":
         help="List all directories, no matter how old")
     args = parser.parse_args()
 
-    resultsdir = args.dir
+    # keep info on whether --dir was specified for parse_start_time(args) below
+    resultsdir = args.dir or Path(RESULTS_DIRECTORY)
+
     if not resultsdir.is_dir():
         print(f"{resultsdir} is not a directory")
         exit(1)
