@@ -25,9 +25,9 @@ should set up everything necessary to run the scripts. The main requirements are
 
 You need to copy `config.example.yaml` to `config.yaml` and set the variables inside it to point to useful directories. The `DATA_DIRECTORY` directory should contain the datasets.
 
-A lot of the experiments we ran use the ["epsilon" dataset](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#epsilon). The simplest setup is to download the `epsilon_normalized.bz2` and `epsilon_normalized.t.bz2` files from this site, to put them in a directory named `epsilon`, and then to set `DATA_DIRECTORY` to the _parent_ of `epsilon`. For example, you could put the two files in `/home/you/jadeite/data/sources/epsilon`, then set `DATA_DIRECTORY` to `/home/you/jadeite/data/sources`.
+The CIFAR-10 and Fashion-MNIST datasets are supported, and are retrieved via `torchvision`, which will download them on first use if the required data isn't already in the location specified in `DATA_DIRECTORY`.
 
-The CIFAR-10 and FashionMNIST datasets are also supported, and are retrieved via `torchvision`, which will download them on first use if the required data isn't already in the location specified in `DATA_DIRECTORY`.
+Some of the experiments we ran use the ["epsilon" dataset](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#epsilon). The simplest setup is to download the `epsilon_normalized.bz2` and `epsilon_normalized.t.bz2` files from this site, to put them in a directory named `epsilon`, and then to set `DATA_DIRECTORY` to the _parent_ of `epsilon`. For example, you could put the two files in `/home/you/jadeite/data/sources/epsilon`, then set `DATA_DIRECTORY` to `/home/you/jadeite/data/sources`. Fair warning: These datasets are about 15 GB when uncompressed.
 
 Usage
 -----
@@ -81,8 +81,25 @@ You can also stop the script as soon as the current experiment is finished, with
 
 How this works: The scripts check after each experiment whether the `stop-now` file exists, and checks the value in the `repeats` file after each full sweep of the experiment matrix.
 
-Coding principles
------------------
+
+Development
+-----------
+
+### Adding a new experiment
+
+To add a new experiment:
+
+1. Write a new subclass of `BaseExperiment` in the `experiments` directory. (There are a number of base subclasses that new subclasses can also inherit from, for example, `BaseFederatedExperiment`.)
+
+  - Be sure to set the `description` class attribute.
+  - The `add_arguments()` class method and `default_params` class attribute should be overridden to add whatever parameters this class needs. You don't need to add arguments defined by parent classes—just call `super().add_arguments()` at the end of your implementation. (At the end, not the beginning, because the base implementation also sets all the default arguments based on `default_params`.)
+
+2. Add this subclass to `experiments_by_name` in `experiments/__init__.py`.
+
+That should be sufficient for it to show up in `python run.py -h`, then you can run the experiment in the same way as the others.
+
+### Coding principles
+
 I don't claim these to be best practice or anything, they're just what I was trying to do when writing this code.
 
 - **Use object-oriented structures to minimize duplication.**
