@@ -11,33 +11,23 @@ from math import sqrt
 import torch
 
 from .experiment import SimpleExperiment
-from .federated import BaseFederatedExperiment
+from .federated import FederatedAveragingExperiment
 
 logger = logging.getLogger(__name__)
 
 
-class SimpleWithNoiseExperiment(SimpleExperiment):
-    """Adds Gaussian noise to the model before every training round."""
+class AddNoiseToModelMixin:
+    """Mixin to add noise directly to a model."""
 
-    default_params = SimpleExperiment.default_params.copy()
-    default_params.update({
+    default_params_to_add = {
         'noise': 1.0,
-    })
-
-    description = """\
-        Non-federated machine learning, but with Gaussian noise added to the
-        model just before every training round.
-    """
+    }
 
     @classmethod
     def add_arguments(cls, parser):
         parser.add_argument("-N", "--noise", type=float,
             help="Noise level (variance), σₙ²")
         super().add_arguments(parser)
-
-    def train(self):
-        self.add_noise_to_model(self.model)
-        return super().train()
 
     def add_noise_to_model(self, model):
         new_state_dict = {}
@@ -50,23 +40,54 @@ class SimpleWithNoiseExperiment(SimpleExperiment):
         model.load_state_dict(new_state_dict)
 
 
-class FederatedAveragingWithNoiseExperiment(BaseFederatedExperiment):
+class SimpleWithNoiseExperiment(AddNoiseToModelMixin, SimpleExperiment):
+    """Adds Gaussian noise to the model before every training round.
+
+    For convenience, noise is added during the testing phase, so the model is
+    tested both before and after adding noise.
+    """
+
+    default_params = SimpleExperiment.default_params.copy()
+    default_params.update(AddNoiseToModelMixin.default_params_to_add)
+
+    description = """\
+        Non-federated machine learning, but with Gaussian noise added to the
+        model once per round.
+    """
+
+    def test(self):
+        prenoise_results = self._test(self.test_dataloader, self.model, record_prefix='prenoise_')
+        self.add_noise_to_model(self.model)
+        postnoise_results = self._test(self.test_dataloader, self.model, record_prefix='postnoise_')
+        return {**prenoise_results, **postnoise_results}
+
+
+class FederatedAveragingWithNoiseExperiment(AddNoiseToModelMixin, FederatedAveragingExperiment):
     """Adds Gaussian noise to the model just before every global model
     synchronization.
+
+    This differs substantially in concept from the analog scheme in
+    `experiments.analog.OverTheAirExperiment`, though it should end up being
+    equivalent in principle. Differences:
+
+     - There is no power constraint or any sort of power scaling.
+     - Noise is not added as part of transmission, but is artificially added
+       only after the averaging step.
 
     This differs from the analog scheme in that this has no power constraint,
     though it should in principle be equivalent to the analog scheme with fixed
     parameter radius (with noise level adjusted).
+
+    For convenience, noise is added during the testing phase, so the model is
+    tested both before and after adding noise.
     """
 
-    default_params = BaseFederatedExperiment.default_params.copy()
-    default_params.update({
-        'noise': 1.0,
-    })
+    default_params = FederatedAveragingExperiment.default_params.copy()
+    default_params.update(AddNoiseToModelMixin.default_params_to_add)
 
     description = """\
         Federated averaging, but with Gaussian noise added to the
-        model just before every global model synchronization.
+        model just after every averaging.
     """
 
     @classmethod
@@ -75,12 +96,16 @@ class FederatedAveragingWithNoiseExperiment(BaseFederatedExperiment):
             help="Noise level (variance), σₙ²")
         super().add_arguments(parser)
 
-    def transmit_and_aggregate(self):
-        client_values = [self.get_values_to_send(model) for model in self.client_models]
-        client_average = torch.stack(client_values, 0).mean(0)
+    def test(self):
+        prenoise_results = self._test(self.test_dataloader, self.global_model,
+                                      record_prefix='prenoise_')
 
-        σₙ = sqrt(self.params['noise'])  # stdev
-        noise = torch.normal(0.0, σₙ, size=client_average.size()).to(self.device)
-        noisy_average = client_average + noise
+        # Since we're adding noise after the averaging step, we need to keep
+        # client models in sync "manually" after we add noise.
+        self.add_noise_to_model(self.global_model)
+        for model in self.client_models:
+            model.load_state_dict(self.global_model.state_dict())
 
-        self.update_global_model(noisy_average)
+        postnoise_results = self._test(self.test_dataloader, self.global_model,
+                                       record_prefix='postnoise_')
+        return {**prenoise_results, **postnoise_results}

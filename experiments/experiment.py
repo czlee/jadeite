@@ -175,11 +175,15 @@ class BaseExperiment:
 
         return loss.item()
 
-    def _test(self, dataloader, model):
+    def _test(self, dataloader, model, record_prefix=''):
         """Evaluates the current model on the test dataset, using both loss and
         all metrics from the instance. The dataloader and model need to be
         provided, so subclasses will probably want to implement a `test()`
         method that calls this.
+
+        `record_prefix`, if provided, is prepended to record keys. This might be
+        used when subclasses want run testing at different times within an
+        epoch/round.
         """
         model.eval()
         nbatches = len(dataloader)
@@ -206,6 +210,9 @@ class BaseExperiment:
 
         for metric_name in results.keys():
             results[metric_name] /= len(dataloader)
+
+        if record_prefix:
+            results = {record_prefix + key: value for key, value in results.items()}
 
         return results
 
