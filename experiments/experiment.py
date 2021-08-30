@@ -270,6 +270,10 @@ class SimpleExperiment(BaseExperiment):
             help="Learning rate scheduler. Currently, other than 'none', only the multistep LR is "
                  "supported, specify like this: multistep-<milestones>[-<gamma>], e.g. "
                  "'multistep-100,150-0.1'.")
+
+        parser.add_argument("--num-examples", type=int, default=None,
+            help="Restrict to use of this many training examples (default is to use the whole dataset)")
+
         super().add_arguments(parser)
 
     @classmethod
@@ -299,6 +303,10 @@ class SimpleExperiment(BaseExperiment):
         )
 
         lr_scheduler = optimizers.make_scheduler(args.lr_scheduler, optimizer)
+
+        if args.num_examples is not None:
+            logger.debug(f"Only using the first {args.num_examples} training examples")
+            train_dataset = torch.utils.data.Subset(train_dataset, range(args.num_examples))
 
         params = cls.extract_params_from_args(args)
         return cls(
