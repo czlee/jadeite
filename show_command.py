@@ -21,7 +21,7 @@ def show_command(directory):
     with open(argsfile) as f:
         args = json.load(f)
 
-    print(f"== command for {directory} ==")
+    print(f"\033[1;36m== {directory} ==\033[0m")
     command = ["python"] + args['command']
     print(" ".join(command))
 

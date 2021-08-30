@@ -1,7 +1,7 @@
 """Shows the duration of runs in the given directories.
 
-Convenience script to help with understanding runtime (for practical uses, not
-research uses)."""
+Convenience script to help with understanding runtime (for practical purposes,
+not substantive research)."""
 
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
@@ -69,7 +69,7 @@ def show_duration_statistics(directory, force=False):
             print(f" - {subd.name:37} {duration_str:>9}")
 
     if not show_all_durations:
-        print(f"{len(data)} experiments, not showing individually")
+        print(f"▶ {len(data)} experiments, not showing individually")
 
     if starts.count(None) + finishes.count(None) == 0:
         earliest_start = min(starts)

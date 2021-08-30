@@ -5,6 +5,8 @@
 
 import csv
 import datetime
+import glob
+import itertools
 import json
 import logging
 import os
@@ -63,18 +65,29 @@ def get_directories_from_args(directories_arg):
     """Interprets directories from command-line arguments and returns a list of
     directories. Intended for use by convenience scripts.
     """
+
     directories = []
 
-    for dirname in directories_arg:
-        directory = Path(RESULTS_DIRECTORY) / dirname
-        if not directory.exists():
-            directory = Path(dirname)
+    for arg in directories_arg:
 
-        if not directory.is_dir():
-            print(f"{directory} is not a directory")
-            continue
+        # can't use Path.glob(), as RESULTS_DIRECTORY might be an absolute path
+        to_check = itertools.chain(
+            glob.glob(arg),
+            glob.glob(str(Path(RESULTS_DIRECTORY) / arg)),
+        )
 
-        directories.append(directory)
+        to_add = []
+        for directory in sorted(to_check):
+            directory = Path(directory)
+            if directory.is_dir():
+                to_add.append(directory)
+            else:
+                print(f"\033[0;33m{directory} is not a directory\033[0m")
+
+        if len(to_add) == 0:
+            print(f"\033[0;33m{arg} is not a directory\033[0m")
+
+        directories.extend(to_add)
 
     return directories
 
