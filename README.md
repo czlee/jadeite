@@ -34,15 +34,17 @@ Usage
 
 ### Experiments
 
-The entry script for running experiments is `run.py`. It takes a subcommand, a short name for the experiment. Currently, the experiments are:
+The entry script for running experiments is `run.py`. It takes a subcommand, a short name for the experiment class. The main experiment classes are:
 
-- `simple`, which runs simple vanilla gradient descent, no federation involved.
-- `fedavg`, which runs federated averaging without communication constraints.
 - `overtheair`, which runs a simple version of our over-the-air analog scheme.
 - `dynpower`, which runs a version of our analog scheme with dynamic power scaling.
 - `stocquant`, which runs a stochastic quantization-based digital scheme.
 - `dynquant`, which runs a digital scheme with dynamically adjusted (stochastic) quantization.
-- `dynrange`, which runs the same dynamic quantization as `dynquant`, but with unconstrained communication.
+
+For a full list of experiment classes:
+```bash
+python run.py --help
+```
 
 To start an experiment, use, for example:
 ```bash
@@ -54,6 +56,8 @@ All of these subcommands have `--help` available, so for example:
 ```bash
 python run.py dynpower --help
 ```
+
+The options `-n`/`--clients` and `-N`/`--noise` (if relevant) are special: they can each take multiple arguments, in which case they form an experiment matrix. For example, `-n 5 20 -N 1e-6 1e-3 1e-1` will have six experiments in its matrix. The `-q`/`--repeat` argument specifies how many times the experiment matrix gets repeated. Each experiment in the matrix and repetition will get its own subdirectory in the automatically created results directory. (All other options only take one value.)
 
 ### Convenience scripts
 
@@ -81,6 +85,14 @@ You can also stop the script as soon as the current experiment is finished, with
 
 How this works: The scripts check after each experiment whether the `stop-now` file exists, and checks the value in the `repeats` file after each full sweep of the experiment matrix.
 
+### Starting multiple jobs
+
+This project doesn't (currently) support running jobs in parallel or any sort of job queueing. I normally just use `screen` commands like
+```bash
+screen -dmS job1 python run.py dynpower -n 5 20 -N 1e-6 1e-3 --dataset=epsilon -r 150
+screen -dmS job2 python run.py dynquant -n 5 20 -N 1e-2 1e-1 --dataset=epsilon -r 150
+```
+if I have enough computational resources to run multiple jobs in parallel.
 
 Development
 -----------
@@ -91,12 +103,22 @@ To add a new experiment:
 
 1. Write a new subclass of `BaseExperiment` in the `experiments` directory. (There are a number of base subclasses that new subclasses can also inherit from, for example, `BaseFederatedExperiment`.)
 
-  - Be sure to set the `description` class attribute.
-  - The `add_arguments()` class method and `default_params` class attribute should be overridden to add whatever parameters this class needs. You don't need to add arguments defined by parent classes—just call `super().add_arguments()` at the end of your implementation. (At the end, not the beginning, because the base implementation also sets all the default arguments based on `default_params`.)
+   - Be sure to set the `description` class attribute; this is what shows up in `python run.py --help`.
+   - The `add_arguments()` class method and `default_params` class attribute should be overridden to add whatever parameters this class needs. You don't need to add arguments defined by parent classes—just call `super().add_arguments()` at the end of your implementation. (Call this at the end, not the beginning, because the base implementation also sets all the default arguments based on `default_params`.)
 
 2. Add this subclass to `experiments_by_name` in `experiments/__init__.py`.
 
 That should be sufficient for it to show up in `python run.py -h`, then you can run the experiment in the same way as the others.
+
+### Adding a new dataset, model, loss or metric
+
+To add a new dataset, model, loss and/or metric:
+
+1. Add another `elif` block to `get_datasets_etc()` in `data/__init__.py` (along with any other code necessary to create the desired objects).
+
+2. Add the new `name` value to `DATASET_CHOICES` (in the same file).
+
+The `name` is what is specified to choose this option using the `-d`/`--dataset` option in `run.py`. Currently, the datasets, model, loss and metric are all specified together—when the user chooses a dataset, they also choose a model, loss and metric. Different models _etc._ with the same dataset are named as a different "dataset". This is mostly to avoid writing a system to intelligently govern a mix-and-match approach.
 
 ### Coding principles
 
@@ -108,7 +130,7 @@ I don't claim these to be best practice or anything, they're just what I was try
 
 - **Parameters and arguments should be specified in the same class.**
 
-  This helps with separation of concerns. The flipside is that we then need an infrastructure to make sure all the arguments get added to the `argparse.ArgumentParser` object, which is why each class has an `add_arguments()` class method, which relies heavily on Python's method resolution order to work correctly.
+  This helps with separation of concerns. The flipside is that we then need an infrastructure to make sure all the arguments get added to the `argparse.ArgumentParser` object, which is why each class has an `add_arguments()` class method, which relies heavily on [Python's method resolution order](https://www.python.org/download/releases/2.3/mro/) to work correctly.
 
 - **Write everything to files straight away in a text-based form.**
 
