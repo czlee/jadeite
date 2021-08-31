@@ -120,6 +120,8 @@ To add a new dataset, model, loss and/or metric:
 
 The `name` is what is specified to choose this option using the `-d`/`--dataset` option in `run.py`. Currently, the datasets, model, loss and metric are all specified together—when the user chooses a dataset, they also choose a model, loss and metric. Different models _etc._ with the same dataset are named as a different "dataset". This is mostly to avoid writing a system to intelligently govern a mix-and-match approach.
 
+If the dataset in question is available in [torchvision](https://pytorch.org/vision/stable/datasets.html), the files `cifar10.py` and `fashionmnist.py` files should be good examples for how to adapt this to this framework.
+
 ### Coding principles
 
 I don't claim these to be best practice or anything, they're just what I was trying to do when writing this code.
@@ -127,6 +129,8 @@ I don't claim these to be best practice or anything, they're just what I was try
 - **Use object-oriented structures to minimize duplication.**
 
   This isn't just a theoretical thing. It makes it easier to "mix and match" experiment structures. Most experiment structures share common code in various ways; an object-oriented approach allows implementations to be written (and fixes and improvements to be made) in exactly one place.
+
+  This includes the use of mixins where functionality is useful in multiple experiment classes. For example, the exponential moving average system is implemented in a mixin, and has its own arguments associated with it (see next item).
 
 - **Parameters and arguments should be specified in the same class.**
 
@@ -140,7 +144,7 @@ I don't claim these to be best practice or anything, they're just what I was try
 
   This is inefficient, but it's a lot easier to work with data this way. For example, it can be inspected directly for quick debugging.
 
-  Plots shouldn't be generated on the fly—they should only be generated from text-based data after the fact. This allows plots to be fine-tuned for presentation without having to rerun the experiments.
+  Plots shouldn't be generated on the fly—they should only be generated from text-based data after the fact. This allows plots to be fine-tuned for presentation without having to rerun the experiments. This repository doesn't deal with any plots—see the [czlee/kyanite](https://github.com/czlee/kyanite) repository.
 
 - **Log enough information to rerun the same experiment.**
 
