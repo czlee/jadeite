@@ -125,6 +125,11 @@ class TestQuantizationMixin(unittest.TestCase):
         expected = torch.tensor([0, 0, 0, 0, 1])
         torch.testing.assert_equal(indices, expected)
 
+        self.set_zero_bits_strategy('exclude')
+        indices = self.mixin.quantize(values, nbits, qrange=2)
+        expected = torch.tensor([0, 0, 0, 0, 1])
+        torch.testing.assert_equal(indices, expected)
+
     def test_unquantize_zero_bits(self):
         indices = torch.tensor([0, 0, 0, 0, 1])
         nbits = torch.tensor([0, 0, 0, 1, 1])
@@ -138,3 +143,38 @@ class TestQuantizationMixin(unittest.TestCase):
         values = self.mixin.unquantize(indices, nbits, qrange=2)
         expected = torch.tensor([0, 0, 0, -2, 2], dtype=torch.float64)
         torch.testing.assert_equal(values, expected)
+
+        self.set_zero_bits_strategy('exclude')
+        values = self.mixin.unquantize(indices, nbits, qrange=2)
+        expected = torch.tensor([float('nan'), float('nan'), float('nan'), -2, 2], dtype=torch.float64)
+        # nan != nan, so test this separately
+        self.assertTrue(values[:3].isnan().all())
+        torch.testing.assert_equal(values[3:], expected[3:])
+
+    def test_client_average_zero_bits(self):
+        nbits = [
+            torch.tensor([0, 1, 0, 0, 1, 0]),
+            torch.tensor([0, 1, 1, 1, 1, 0]),
+            torch.tensor([1, 1, 1, 0, 0, 0]),
+        ]
+        values = [
+            torch.tensor([-2, +2, +2, -2, +2, -2], dtype=torch.float64),
+            torch.tensor([+2, -2, -2, +2, +2, -2], dtype=torch.float64),
+            torch.tensor([+2, +2, -2, -2, -2, +2], dtype=torch.float64),
+        ]
+
+        # average using zero for no-bit values
+        self.set_zero_bits_strategy('read-zero')
+        quantized = [self.mixin.quantize(v, n, qrange=2) for v, n in zip(values, nbits)]
+        unquantized = [self.mixin.unquantize(i, n, qrange=2) for i, n in zip(quantized, nbits)]
+        average = self.mixin.compute_client_average(unquantized)
+        expected = torch.tensor([+2, +2, -4, +2, +4, 0], dtype=torch.float64) / 3
+        torch.testing.assert_equal(average, expected)
+
+        # average excluding no-bit values
+        self.set_zero_bits_strategy('exclude')
+        quantized = [self.mixin.quantize(v, n, qrange=2) for v, n in zip(values, nbits)]
+        unquantized = [self.mixin.unquantize(i, n, qrange=2) for i, n in zip(quantized, nbits)]
+        average = self.mixin.compute_client_average(unquantized)
+        expected = torch.tensor([+2, +2 / 3, -2, +2, +2, 0], dtype=torch.float64)
+        torch.testing.assert_equal(average, expected)
