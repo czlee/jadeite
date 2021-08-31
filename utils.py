@@ -134,6 +134,13 @@ def log_arguments(args, results_dir: Path, other_info=None):
 
     info['command'] = sys.argv
 
+    try:
+        pip_command = [sys.executable, "-m", "pip", "list", "--format", "freeze"]
+        info['packages'] = subprocess.check_output(pip_command).decode().strip().split("\n")
+    except subprocess.CalledProcessError:
+        logger.warning("Could not get package list from pip")
+        info['packages'] = None
+
     with open(results_dir / "arguments.json", 'w') as f:
         json.dump(info, f, indent=2)
 
