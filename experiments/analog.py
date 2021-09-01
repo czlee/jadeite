@@ -129,6 +129,11 @@ class OverTheAirExperiment(BaseOverTheAirExperiment):
         B = self.params['parameter_radius']  # noqa: N806
 
         scaled_symbols = symbols / self.nclients * B / sqrt(P)
+
+        # log rx power, this is for debugging
+        rx_power = symbols.square().mean().item()
+        self.records["rx_power"] = rx_power
+
         self.update_global_model(scaled_symbols)
 
 
