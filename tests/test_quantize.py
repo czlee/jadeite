@@ -80,6 +80,9 @@ class TestQuantizationMixin(unittest.TestCase):
             quantized[i, :] = self.mixin.unquantize(indices, nbits, qrange)
         averages = quantized.mean(axis=0)
 
+        self.assertTrue(averages.le(qrange).all())
+        self.assertTrue(averages.ge(-qrange).all())
+
         # as tolerance, using 8 times the standard deviation of the quantized
         # values (as computed from the scaled binomial distribution)
         deltas = 8 * torch.sqrt(2 * qrange / (2 ** nbits - 1) / 4 / nsamples)
@@ -89,11 +92,10 @@ class TestQuantizationMixin(unittest.TestCase):
         # point precision, but I'm not quite sure
         deltas = deltas.clip(min=5e-6)
 
-        self.assertTrue(averages.le(qrange).all())
-        self.assertTrue(averages.ge(-qrange).all())
-
         diffs = torch.abs(values - averages)
-        self.assertTrue(torch.lt(diffs, deltas).all())
+        worst_margin, index = ((diffs - deltas) / deltas).max(dim=0)
+        self.assertTrue(torch.lt(diffs, deltas).all(),
+            msg=f"worst margin was {worst_margin:.4g} ({diffs[index]:.4g} > {deltas[index]:.4g})")
 
     def test_quantization_stochastically(self):
         n = 50
