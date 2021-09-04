@@ -40,6 +40,21 @@ ARGUMENT_ABBREVIATIONS = {
     'repeat': 'rep',
     'rounds': 'rds',
     'optimizer': 'opt',
+    'parameter_radius_initial': 'Bin',
+}
+
+DATASET_ABBREVIATIONS = {
+    "epsilon": "eps",
+    "epsilon-small": "eps-sm",
+    "cifar10-simple": "c10-sim",
+    "cifar10-simple-flipcrop": "c10-sim-fc",
+    "cifar10-resnet20": "c10-r20",
+    "cifar10-resnet18": "c10-r18",
+    "cifar10-resnet20-flipcrop": "c10-r20-fc",
+    "cifar10-resnet18-flipcrop": "c10-r18-fc",
+    "fashionmnist-simple": "fmn-sim",
+    "fashionmnist-cnn1": "fmn-cnn1",
+    "fashionmnist-cnn2": "fmn-cnn2",
 }
 
 DEFAULT_ARGUMENTS = {
@@ -59,11 +74,13 @@ DEFAULT_ARGUMENTS = {
     'epochs': 1,
     'ema_coefficient': 1 / 3,
     'power_update_period': 1,
-    'power_quantile': 0.9,
+    'power_quantile': 1.0,
     'power_factor': 0.9,
+    'parameter_radius_initial': 1.0,
     'qrange_update_period': 1,
-    'qrange_param_quantile': 0.9,
-    'qrange_client_quantile': 0.9,
+    'qrange_param_quantile': 1.0,
+    'qrange_client_quantile': 1.0,
+    'qrange_initial': 1.0,
     'rounding_method': 'stochastic',
     'zero_bits_strategy': 'read-zero',
     'save_models': False,
@@ -143,8 +160,10 @@ def format_args_string(arguments, always_show=[], repeat_changed=False):
 
     formatted_args = []
     for key, value in args_items:
-        if DEFAULT_ARGUMENTS.get(key) == value and key not in always_show:
+        key_in_always_show = key in always_show or shorten_key_name(key) in always_show
+        if DEFAULT_ARGUMENTS.get(key) == value and not key_in_always_show:
             continue
+
         if key == 'repeat' and repeat_changed:
             value = f"\033[1;35m{value}"
         formatted_args.append(format_argument(key, value))
@@ -157,7 +176,7 @@ def format_argument(key, value):
     key = shorten_key_name(key)
     value = format_arg_value(value)
     if is_composite:
-        return f"\033[1;36m{key}=\033[0;36m{value}\033[0m"
+        return f"\033[0;34m{key}=\033[1;34m{value}\033[0m"
     else:
         return f"\033[0;90m{key}=\033[0m{value}"
 
@@ -175,6 +194,8 @@ def shorten_key_name(key):
 def format_arg_single_value(value):
     if isinstance(value, float):
         return f"{value:.4g}"
+    elif value in DATASET_ABBREVIATIONS:
+        return DATASET_ABBREVIATIONS[value]
     return str(value)
 
 
@@ -394,15 +415,18 @@ def matches_filter(filter_args, script, arguments):
     considered to match vacuously, i.e. False is only returned if there is
     a specific argument that does not match.
     """
+    arguments_with_shortened_keys = {shorten_key_name(key): value for key, value in arguments.items()}
+
     for filter_key, filter_value in filter_args.items():
-        if filter_key == '__script__':
-            if script != filter_args['__script__']:
+        if filter_key == 'script':
+            if script != filter_args['script']:
                 return False
-            continue
-        if filter_key not in arguments:
-            continue
-        if format_arg_single_value(arguments[filter_key]) != filter_value:
-            return False
+        elif filter_key in arguments:
+            if format_arg_single_value(arguments[filter_key]) != filter_value:
+                return False
+        elif filter_key in arguments_with_shortened_keys:
+            if format_arg_single_value(arguments_with_shortened_keys[filter_key]) != filter_value:
+                return False
     return True
 
 
