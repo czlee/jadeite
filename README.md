@@ -1,7 +1,7 @@
 Computational experiments on over-the-air statistical estimation
 ================================================================
 
-_Chuan-Zheng Lee <czlee@stanford.edu>_
+_Chuan-Zheng Lee <czlee@alumni.stanford.edu>_
 
 This repository contains work relating to computational experiments for over-the-air statistical estimation.
 
@@ -9,8 +9,10 @@ Work on analysing results of running this code is in the [czlee/kyanite](https:/
 
 Papers related to this work:
 
+- C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9563940)", to appear in _IEEE Journal on Selected Areas in Communications_.
 - C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9322345)", IEEE GLOBECOM 2020
 - C.Z. Lee, L.P. Barnes, A. Özgür, "[Lower Bounds for Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9518157)", IEEE ISIT 2021
+- C.Z. Lee, L.P. Barnes, W. Zhan, A. Özgür, "Over-the-Air Statistical Estimation for Sparse Models", to appear at IEEE GLOBECOM 2021.
 
 This repository is mostly licensed under the MIT License, except for the file data/resnet.py, which is copied from [Yerlan Idelbayev's repository](https://github.com/akamaster/pytorch_resnet_cifar10/) and licensed under the BSD 2-Clause License.
 
@@ -149,3 +151,7 @@ I don't claim these to be best practice or anything, they're just what I was try
 - **Log enough information to rerun the same experiment.**
 
   This includes the Git commit hash, whether any files were changed, timestamps and the command used to invoke the experiment. This might seem like it contains redundant information, but sometimes argument definitions change, so it can be hard to be sure _exactly_ how an experiment was started with older code.
+
+### Why is this repository called "jadeite"?
+
+I named my PhD project repositories after arbitrarily chosen gemstones following the letters of the alphabet. This is the tenth such repository, so it got a name starting with "J". The results repository, [kyanite](https://github.com/czlee/kyanite), is the eleventh.
