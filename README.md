@@ -9,10 +9,10 @@ Work on analysing results of running this code is in the [czlee/kyanite](https:/
 
 Papers related to this work:
 
-- C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9563940)", to appear in _IEEE Journal on Selected Areas in Communications_.
+- C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9563940)", _IEEE Journal on Selected Areas in Communications_, vol. 40, no. 2, pp. 548–561, 2021
 - C.Z. Lee, L.P. Barnes, A. Özgür, "[Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9322345)", IEEE GLOBECOM 2020
 - C.Z. Lee, L.P. Barnes, A. Özgür, "[Lower Bounds for Over-the-Air Statistical Estimation](https://ieeexplore.ieee.org/document/9518157)", IEEE ISIT 2021
-- C.Z. Lee, L.P. Barnes, W. Zhan, A. Özgür, "Over-the-Air Statistical Estimation for Sparse Models", to appear at IEEE GLOBECOM 2021.
+- C.Z. Lee, L.P. Barnes, W. Zhan, A. Özgür, "Over-the-Air Statistical Estimation for Sparse Models", IEEE GLOBECOM 2021.
 
 This repository is mostly licensed under the MIT License, except for the file data/resnet.py, which is copied from [Yerlan Idelbayev's repository](https://github.com/akamaster/pytorch_resnet_cifar10/) and licensed under the BSD 2-Clause License.
 
