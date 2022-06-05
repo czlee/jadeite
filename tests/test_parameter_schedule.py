@@ -3,11 +3,15 @@
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
 
+import functools
 import unittest
 
 import torch
 
 from experiments.digital import BaseDigitalFederatedExperiment
+
+
+assert_equal = functools.partial(torch.testing.assert_close, rtol=0, atol=0)
 
 
 class ExperimentTest(BaseDigitalFederatedExperiment):
@@ -83,7 +87,7 @@ class TestParameterScheduling(unittest.TestCase):
 
         for kwargs, expected in specs:
             calculated = self.calculate_bits_per_tx_parameter(**kwargs)
-            torch.testing.assert_equal(calculated, expected)
+            assert_equal(calculated, expected)
 
     def test_bits_per_tx_parameter_staggered(self):
         self.experiment.params['parameter_schedule'] = 'staggered'
@@ -128,4 +132,4 @@ class TestParameterScheduling(unittest.TestCase):
 
         for kwargs, expected in specs:
             calculated = self.calculate_bits_per_tx_parameter(**kwargs)
-            torch.testing.assert_equal(calculated, expected)
+            assert_equal(calculated, expected)

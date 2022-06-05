@@ -3,11 +3,15 @@
 # Chuan-Zheng Lee <czlee@stanford.edu>
 # July 2021
 
+import functools
 import unittest
 
 import torch
 
 from experiments.digital import QuantizationWithEqualBinsMixin
+
+
+assert_equal = functools.partial(torch.testing.assert_close, rtol=0, atol=0)
 
 
 class TestQuantizationMixin(unittest.TestCase):
@@ -120,17 +124,17 @@ class TestQuantizationMixin(unittest.TestCase):
         self.set_zero_bits_strategy('min-one')
         indices = self.mixin.quantize(values, nbits, qrange=2)
         expected = torch.tensor([0, 1, 1, 0, 1])
-        torch.testing.assert_equal(indices, expected)
+        assert_equal(indices, expected)
 
         self.set_zero_bits_strategy('read-zero')
         indices = self.mixin.quantize(values, nbits, qrange=2)
         expected = torch.tensor([0, 0, 0, 0, 1])
-        torch.testing.assert_equal(indices, expected)
+        assert_equal(indices, expected)
 
         self.set_zero_bits_strategy('exclude')
         indices = self.mixin.quantize(values, nbits, qrange=2)
         expected = torch.tensor([0, 0, 0, 0, 1])
-        torch.testing.assert_equal(indices, expected)
+        assert_equal(indices, expected)
 
     def test_unquantize_zero_bits(self):
         indices = torch.tensor([0, 0, 0, 0, 1])
@@ -139,19 +143,19 @@ class TestQuantizationMixin(unittest.TestCase):
         self.set_zero_bits_strategy('min-one')
         values = self.mixin.unquantize(indices, nbits, qrange=2)
         expected = torch.tensor([-2, -2, -2, -2, 2], dtype=torch.float64)
-        torch.testing.assert_equal(values, expected)
+        assert_equal(values, expected)
 
         self.set_zero_bits_strategy('read-zero')
         values = self.mixin.unquantize(indices, nbits, qrange=2)
         expected = torch.tensor([0, 0, 0, -2, 2], dtype=torch.float64)
-        torch.testing.assert_equal(values, expected)
+        assert_equal(values, expected)
 
         self.set_zero_bits_strategy('exclude')
         values = self.mixin.unquantize(indices, nbits, qrange=2)
         expected = torch.tensor([float('nan'), float('nan'), float('nan'), -2, 2], dtype=torch.float64)
         # nan != nan, so test this separately
         self.assertTrue(values[:3].isnan().all())
-        torch.testing.assert_equal(values[3:], expected[3:])
+        assert_equal(values[3:], expected[3:])
 
     def test_client_average_zero_bits(self):
         nbits = [
@@ -171,7 +175,7 @@ class TestQuantizationMixin(unittest.TestCase):
         unquantized = [self.mixin.unquantize(i, n, qrange=2) for i, n in zip(quantized, nbits)]
         average = self.mixin.compute_client_average(unquantized)
         expected = torch.tensor([+2, +2, -4, +2, +4, 0], dtype=torch.float64) / 3
-        torch.testing.assert_equal(average, expected)
+        assert_equal(average, expected)
 
         # average excluding no-bit values
         self.set_zero_bits_strategy('exclude')
@@ -179,4 +183,4 @@ class TestQuantizationMixin(unittest.TestCase):
         unquantized = [self.mixin.unquantize(i, n, qrange=2) for i, n in zip(quantized, nbits)]
         average = self.mixin.compute_client_average(unquantized)
         expected = torch.tensor([+2, +2 / 3, -2, +2, +2, 0], dtype=torch.float64)
-        torch.testing.assert_equal(average, expected)
+        assert_equal(average, expected)
